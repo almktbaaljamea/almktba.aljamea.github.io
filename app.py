@@ -204,9 +204,6 @@ def export_excel():
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ========== لوحة التحكم ==========
-# ... (دالة admin() بدون تغيير عن آخر نسخة لدينا، مع الأزرار الجديدة للتصدير)
-# نستخدم نفس دالة admin() من آخر تحديث تم.
-# (سأدرجها هنا كاملة لضمان عدم وجود أخطاء)
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.args.get("password") != ADMIN_PASSWORD:
@@ -557,7 +554,7 @@ def admin():
     </html>
     """, books=books_list, books_count=len(books_list), admin_password=ADMIN_PASSWORD, libraries=libraries, selected_library=selected_library)
 
-# ========== واجهة المستخدم (المكتبة الجامعة) – تم تحديثها بميزة الـ Loader ==========
+# ========== واجهة المستخدم (المكتبة الجامعة) – تم تحديثها بميزة الـ Loader وإصلاح تضارب الكتب ==========
 HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -1029,8 +1026,9 @@ HTML = """
           html += `<div class="library-name">🏛 ${lib}</div><div class="books-grid">`;
           grouped[city][lib].forEach(book => {
             const img = book.cover_image || 'https://via.placeholder.com/80x110/1e293b/94a3b8?text=No+Cover';
+            // ✅ التعديل الأول: استخدام book.id بدلاً من book.book_name
             html += `
-              <div class="book-card" onclick="openBookModal('${encodeURIComponent(book.book_name || '')}')">
+              <div class="book-card" onclick="openBookModal(${book.id})">
                 <img src="${img}" alt="${book.book_name}" loading="lazy">
                 <div class="book-details">
                   <div class="book-title">${book.book_name || '---'}</div>
@@ -1046,27 +1044,27 @@ HTML = """
       document.getElementById('results').innerHTML = html;
     }
 
-    function openBookModal(encodedName) {
-      const bookName = decodeURIComponent(encodedName);
-      const book = currentResults.find(b => b.book_name === bookName);
+    // ✅ التعديل الثاني: تحديث دالة openBookModal لتعمل بالمعرف bookId
+    function openBookModal(bookId) {
+      const book = currentResults.find(b => b.id == bookId);
       if (!book) return;
       const body = document.getElementById('modalBody');
       const imgSrc = book.cover_image || 'https://via.placeholder.com/150x220/1e293b/94a3b8?text=No+Cover';
-      const googleBooksSearchUrl = `https://www.google.com/search?tbm=bks&q=${encodeURIComponent(bookName)}`;
+      const googleBooksSearchUrl = `https://www.google.com/search?tbm=bks&q=${encodeURIComponent(book.book_name)}`;
       body.innerHTML = `
         <div class="modal-book-header">
-          <img src="${imgSrc}" alt="${bookName}">
+          <img src="${imgSrc}" alt="${book.book_name}">
           <div class="modal-book-info">
-            <h2>${bookName}</h2>
+            <h2>${book.book_name}</h2>
             <p>📘 الناشر: ${book.publisher || 'غير معروف'}</p>
             <p>🏛 المكتبة: ${book.library || 'غير محددة'}</p>
             <p>📍 المدينة: ${book.city || 'غير محددة'}</p>
             <p class="price">💰 السعر: ${book.price || 'غير متوفر'}</p>
             <div class="rating-section">
-              <div class="goodreads-btn" onclick="openGoodreads('${encodeURIComponent(bookName)}')">📊 تقييمات ومراجعات Goodreads</div>
+              <div class="goodreads-btn" onclick="openGoodreads('${encodeURIComponent(book.book_name)}')">📊 تقييمات ومراجعات Goodreads</div>
               <a href="${googleBooksSearchUrl}" target="_blank" class="googlebooks-btn">📖 آراء Google Books</a>
             </div>
-            <button class="share-btn" onclick="shareBook('${bookName}')">📤 مشاركة الكتاب</button>
+            <button class="share-btn" onclick="shareBook('${book.book_name}')">📤 مشاركة الكتاب</button>
           </div>
         </div>
       `;
