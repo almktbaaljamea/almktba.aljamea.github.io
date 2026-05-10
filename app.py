@@ -159,13 +159,11 @@ def export_excel():
     if request.args.get("password") != ADMIN_PASSWORD:
         return "غير مصرح", 403
 
-    mode = request.args.get("mode", "all")  # all أو library
+    mode = request.args.get("mode", "all")
     library_filter = request.args.get("library", "")
 
     conn = get_db()
-
     if mode == "library" and library_filter:
-        # تصدير مكتبة واحدة فقط
         rows = conn.execute(
             "SELECT * FROM books WHERE library = ? ORDER BY CAST(price AS REAL) DESC, id DESC",
             (library_filter,)
@@ -177,18 +175,14 @@ def export_excel():
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name=library_filter[:31])  # اسم الورقة أقصى 31 حرفًا
+            df.to_excel(writer, index=False, sheet_name=library_filter[:31])
         output.seek(0)
-
         filename = f"books_{library_filter}.xlsx"
         return send_file(output, as_attachment=True, download_name=filename,
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    # وضع all: تصدير جميع المكتبات في أوراق متعددة
-    libraries = [row[0] for row in conn.execute(
-        "SELECT DISTINCT library FROM books WHERE library != '' ORDER BY library"
-    ).fetchall()]
-
+    # وضع all
+    libraries = [row[0] for row in conn.execute("SELECT DISTINCT library FROM books WHERE library != '' ORDER BY library").fetchall()]
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         for lib in libraries:
@@ -201,17 +195,18 @@ def export_excel():
             df = pd.DataFrame([dict(row) for row in rows])
             cols = ["id", "book_name", "city", "library", "price", "publisher", "isbn", "cover_image"]
             df = df[cols] if all(col in df.columns for col in cols) else df
-            # اسم الورقة: أول 31 حرفًا من اسم المكتبة
             sheet_name = lib[:31]
             df.to_excel(writer, index=False, sheet_name=sheet_name)
     conn.close()
     output.seek(0)
-
     filename = "books_all_libraries.xlsx"
     return send_file(output, as_attachment=True, download_name=filename,
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # ========== لوحة التحكم ==========
+# ... (دالة admin() بدون تغيير عن آخر نسخة لدينا، مع الأزرار الجديدة للتصدير)
+# نستخدم نفس دالة admin() من آخر تحديث تم.
+# (سأدرجها هنا كاملة لضمان عدم وجود أخطاء)
 @app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.args.get("password") != ADMIN_PASSWORD:
@@ -231,7 +226,6 @@ def admin():
     ).fetchall()]
     selected_library = request.args.get("library", "")
 
-    # تجهيز قائمة المكتبات مع الشعارات (يدعم png, jpg, jpeg)
     libraries = []
     for lib in library_names:
         safe_name = lib.replace(' ', '_')
@@ -244,7 +238,6 @@ def admin():
                 break
         libraries.append({'name': lib, 'logo': logo_url})
 
-    # جلب الكتب حسب المكتبة المختارة
     if selected_library:
         all_books = conn.execute(
             "SELECT * FROM books WHERE library = ? ORDER BY id DESC",
@@ -257,11 +250,8 @@ def admin():
     books_list = [dict(row) for row in all_books]
     conn.close()
 
-    # معالجة طلبات POST (حذف، تعديل، استيراد، إضافة)
     if request.method == "POST":
         action = request.form.get("action", "")
-
-        # ---- حذف كتاب ----
         if action == "delete":
             book_id = request.form.get("id")
             conn = get_db()
@@ -270,11 +260,10 @@ def admin():
             conn.close()
             return jsonify({"status": "ok", "msg": "تم الحذف"})
 
-        # ---- تعديل كتاب ----
         if action == "edit":
             book_id = request.form.get("id")
             conn = get_db()
-            conn.execute("""UPDATE books SET
+            conn.execute("""UPDATE books SET 
                 book_name=?, city=?, library=?, price=?, publisher=?, cover_image=?, isbn=?
                 WHERE id=?""", (
                 request.form["book_name"], request.form["city"], request.form["library"],
@@ -285,32 +274,26 @@ def admin():
             conn.close()
             return jsonify({"status": "ok", "msg": "تم التعديل"})
 
-        # ---- استيراد جماعي ----
         if "file" in request.files and request.files["file"].filename != "":
             file = request.files["file"]
             filename = secure_filename(file.filename)
             filepath = os.path.join("/tmp", filename)
             file.save(filepath)
-
             target_library = request.form.get("target_library", "")
             new_library = request.form.get("new_library", "")
             final_library = new_library if new_library else target_library
-
             try:
                 if filename.endswith(".csv"):
                     df = pd.read_csv(filepath)
                 else:
                     df = pd.read_excel(filepath)
                 df = df.fillna("")
-
                 required_cols = ["book_name", "city", "library", "price", "publisher", "cover_image", "isbn"]
                 for col in required_cols:
                     if col not in df.columns:
                         df[col] = ""
-
                 if final_library:
                     df["library"] = final_library
-
                 conn = get_db()
                 count = 0
                 for _, row in df.iterrows():
@@ -324,14 +307,9 @@ def admin():
                     if not exists:
                         conn.execute("""INSERT INTO books (book_name, city, library, price, publisher, cover_image, isbn)
                             VALUES (?, ?, ?, ?, ?, ?, ?)""", (
-                            book_name,
-                            row.get("city", ""),
-                            row.get("library", ""),
-                            str(row.get("price", "")),
-                            row.get("publisher", ""),
-                            row.get("cover_image", ""),
-                            str(row.get("isbn", ""))
-                        ))
+                            book_name, row.get("city", ""), row.get("library", ""),
+                            str(row.get("price", "")), row.get("publisher", ""),
+                            row.get("cover_image", ""), str(row.get("isbn", ""))))
                         count += 1
                 conn.commit()
                 conn.close()
@@ -339,13 +317,9 @@ def admin():
                 msg = f"✅ تم استيراد {count} كتاباً جديداً!"
             except Exception as e:
                 msg = f"❌ خطأ أثناء الاستيراد: {str(e)}"
+            return render_template_string("<h2>{{ msg }}</h2><a href='/admin?password=" + ADMIN_PASSWORD + "&library=" + selected_library + "'>رجوع</a>", msg=msg)
 
-            return render_template_string(
-                "<h2>{{ msg }}</h2><a href='/admin?password=" + ADMIN_PASSWORD + "&library=" + selected_library + "'>رجوع</a>",
-                msg=msg
-            )
-
-        # ---- إضافة كتاب واحد ----
+        # إضافة كتاب واحد
         conn = get_db()
         conn.execute("""INSERT INTO books (book_name, city, library, price, publisher, cover_image, isbn)
             VALUES (?, ?, ?, ?, ?, ?, ?)""", (
@@ -356,7 +330,7 @@ def admin():
         conn.close()
         return redirect(f"/admin?password={ADMIN_PASSWORD}&library={selected_library}&msg=تمت الإضافة")
 
-    # ---------- عرض الصفحة الكاملة (GET) ----------
+    # ---------- عرض الصفحة ----------
     return render_template_string("""
     <!DOCTYPE html>
     <html dir="rtl">
@@ -518,11 +492,9 @@ def admin():
 
       <script>
         const ADMIN_PASSWORD = "{{ admin_password }}";
-
         function showImportOptions() {
             document.getElementById("importOptions").style.display = "block";
         }
-
         function applyFilters() {
             let nameFilter = document.getElementById("filterBookName").value.toLowerCase().trim();
             let libFilter = document.getElementById("filterLibrary").value.toLowerCase().trim();
@@ -542,7 +514,6 @@ def admin():
                 tr[i].style.display = match ? "" : "none";
             }
         }
-
         function editBook(id) {
             let row = document.getElementById("row-" + id);
             document.getElementById("edit_id").value = id;
@@ -555,7 +526,6 @@ def admin():
             document.getElementById("edit_cover").value = row.querySelector("img")?.src || "";
             document.getElementById("editModal").style.display = "block";
         }
-
         function submitEdit() {
             let form = document.getElementById("editForm");
             let formData = new FormData(form);
@@ -568,7 +538,6 @@ def admin():
                 location.reload();
             }).catch(err => alert("خطأ"));
         }
-
         function deleteBook(id) {
             if (confirm("هل أنت متأكد من حذف هذا الكتاب؟")) {
                 let formData = new FormData();
@@ -588,7 +557,7 @@ def admin():
     </html>
     """, books=books_list, books_count=len(books_list), admin_password=ADMIN_PASSWORD, libraries=libraries, selected_library=selected_library)
 
-# ========== واجهة المستخدم (المكتبة الجامعة) ==========
+# ========== واجهة المستخدم (المكتبة الجامعة) – تم تحديثها بميزة الـ Loader ==========
 HTML = """
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -675,13 +644,11 @@ HTML = """
     }
     .filter-section { margin-bottom: 20px; }
     .filter-section h4 { color: #fbbf24; margin-bottom: 8px; }
-
     .filter-search {
       width: 100%; padding: 8px 12px; margin-bottom: 8px;
       border-radius: 8px; border: 1px solid #334155;
       background: #0f172a; color: white; font-size: 0.9em;
     }
-
     .checkbox-group {
       max-height: 150px; overflow-y: auto;
       border: 1px solid #334155; border-radius: 8px;
@@ -694,13 +661,10 @@ HTML = """
       font-size: 0.85em; cursor: pointer; white-space: nowrap;
     }
     .select-all { color: #38bdf8; font-weight: bold; }
-
     .price-range { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .price-range input { width: 100px; padding: 8px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; }
     .filter-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-    .filter-actions button {
-      padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-size: 1em;
-    }
+    .filter-actions button { padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-size: 1em; }
     .apply-btn { background: #2563eb; color: white; }
     .apply-btn:hover { background: #1d4ed8; }
     .reset-btn { background: #334155; color: white; }
@@ -723,10 +687,7 @@ HTML = """
     }
     .close:hover { color: #fbbf24; }
     .modal-book-header { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
-    .modal-book-header img {
-      width: 150px; height: 220px; object-fit: cover; border-radius: 12px;
-      border: 1px solid #334155;
-    }
+    .modal-book-header img { width: 150px; height: 220px; object-fit: cover; border-radius: 12px; border: 1px solid #334155; }
     .modal-book-info { flex: 1; min-width: 250px; }
     .modal-book-info h2 { color: #fbbf24; margin-bottom: 8px; font-size: 1.5em; }
     .modal-book-info p { margin: 6px 0; color: #cbd5e1; font-size: 1em; }
@@ -751,6 +712,28 @@ HTML = """
     }
     .share-btn:hover { background: #475569; }
 
+    /* شاشة التحميل العامة */
+    .global-loader {
+      display: none; position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px);
+      z-index: 9999; flex-direction: column; justify-content: center; align-items: center;
+    }
+    .global-loader img {
+      width: 110px; height: 110px;
+      border-radius: 50%;
+      box-shadow: 0 0 20px rgba(251,191,36,0.6);
+      animation: pulse 1.5s infinite;
+    }
+    .global-loader p {
+      color: #fbbf24; margin-top: 20px; font-size: 1.3em; font-weight: bold;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(251, 191, 36, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+    }
+
     @media (max-width: 600px) {
       .search-box { flex-direction: column; }
       .filter-toggle-btn { width: 100%; }
@@ -760,6 +743,12 @@ HTML = """
   </style>
 </head>
 <body>
+  <!-- شاشة التحميل العامة -->
+  <div id="globalLoader" class="global-loader">
+    <img src="/static/logo.png" alt="جاري التحميل">
+    <p id="loaderText">جاري التحميل...</p>
+  </div>
+
   <div class="container">
     <div class="header-section">
       <img src="/static/logo.png" alt="شعار المكتبة الجامعة" class="logo-img">
@@ -777,11 +766,10 @@ HTML = """
     <div id="results"></div>
   </div>
 
-  <!-- نافذة الفلاتر المتقدمة -->
+  <!-- نافذة الفلاتر -->
   <div id="filterModal" class="filter-modal">
     <div class="filter-modal-content">
       <h3 style="color:#fbbf24; margin-bottom:20px;">تخصيص البحث</h3>
-
       <div class="filter-section">
         <h4>🏙️ المدن</h4>
         <input type="text" class="filter-search" placeholder="بحث عن مدينة..." oninput="filterGroup('citiesGroup', this.value)">
@@ -829,6 +817,15 @@ HTML = """
 
     let currentResults = [];
 
+    // دوال التحكم في شاشة التحميل
+    function showLoader(text = "جاري التحميل...") {
+      document.getElementById('loaderText').innerHTML = text;
+      document.getElementById('globalLoader').style.display = 'flex';
+    }
+    function hideLoader() {
+      document.getElementById('globalLoader').style.display = 'none';
+    }
+
     // ---------- دوال الفلاتر ----------
     function getUniqueValues(data, key) {
       return [...new Set(data.map(b => b[key]).filter(v => v))];
@@ -852,20 +849,14 @@ HTML = """
       const allItems = document.querySelectorAll(`.${prefix}-item`);
       const allChecked = Array.from(allItems).every(cb => cb.checked);
       document.getElementById(`${prefix}_all`).checked = allChecked;
-      if (prefix === 'city') {
-        updateLibrariesBasedOnSelectedCities(false);
-      } else if (prefix === 'library') {
-        updatePublishersBasedOnSelectedLibraries();
-      }
+      if (prefix === 'city') updateLibrariesBasedOnSelectedCities(false);
+      else if (prefix === 'library') updatePublishersBasedOnSelectedLibraries();
     }
 
     function toggleSelectAll(prefix, isChecked) {
       document.querySelectorAll(`.${prefix}-item`).forEach(cb => cb.checked = isChecked);
-      if (prefix === 'city') {
-        updateLibrariesBasedOnSelectedCities(true);
-      } else if (prefix === 'library') {
-        updatePublishersBasedOnSelectedLibraries();
-      }
+      if (prefix === 'city') updateLibrariesBasedOnSelectedCities(true);
+      else if (prefix === 'library') updatePublishersBasedOnSelectedLibraries();
     }
 
     function getSelectedValues(prefix) {
@@ -876,9 +867,7 @@ HTML = """
       const selectedCities = getSelectedValues('city');
       const allCitiesChecked = document.getElementById('city_all').checked;
       let filtered = currentResults;
-      if (!allCitiesChecked && selectedCities.length > 0) {
-        filtered = filtered.filter(b => selectedCities.includes(b.city));
-      }
+      if (!allCitiesChecked && selectedCities.length > 0) filtered = filtered.filter(b => selectedCities.includes(b.city));
       const libraries = getUniqueValues(filtered, 'library');
       buildCheckboxGroup('librariesGroup', libraries, 'library', keepLibraryAll);
       if (!keepLibraryAll) {
@@ -894,18 +883,11 @@ HTML = """
       const selectedLibraries = getSelectedValues('library');
       const allCitiesChecked = document.getElementById('city_all')?.checked ?? true;
       const allLibrariesChecked = document.getElementById('library_all')?.checked ?? false;
-
       let filtered = currentResults;
-      if (!allCitiesChecked && selectedCities.length > 0) {
-        filtered = filtered.filter(b => selectedCities.includes(b.city));
-      }
+      if (!allCitiesChecked && selectedCities.length > 0) filtered = filtered.filter(b => selectedCities.includes(b.city));
       if (!allLibrariesChecked) {
-        if (selectedLibraries.length > 0) {
-          filtered = filtered.filter(b => selectedLibraries.includes(b.library));
-        } else {
-          buildCheckboxGroup('publishersGroup', [], 'publisher', false);
-          return;
-        }
+        if (selectedLibraries.length > 0) filtered = filtered.filter(b => selectedLibraries.includes(b.library));
+        else { buildCheckboxGroup('publishersGroup', [], 'publisher', false); return; }
       }
       const publishers = getUniqueValues(filtered, 'publisher');
       buildCheckboxGroup('publishersGroup', publishers, 'publisher', allLibrariesChecked);
@@ -918,22 +900,15 @@ HTML = """
         buildCheckboxGroup('publishersGroup', [], 'publisher', false);
         return;
       }
-      const cities = getUniqueValues(currentResults, 'city');
-      const libraries = getUniqueValues(currentResults, 'library');
-      const publishers = getUniqueValues(currentResults, 'publisher');
-      buildCheckboxGroup('citiesGroup', cities, 'city', defaultAll);
-      buildCheckboxGroup('librariesGroup', libraries, 'library', defaultAll);
-      buildCheckboxGroup('publishersGroup', publishers, 'publisher', defaultAll);
+      buildCheckboxGroup('citiesGroup', getUniqueValues(currentResults, 'city'), 'city', defaultAll);
+      buildCheckboxGroup('librariesGroup', getUniqueValues(currentResults, 'library'), 'library', defaultAll);
+      buildCheckboxGroup('publishersGroup', getUniqueValues(currentResults, 'publisher'), 'publisher', defaultAll);
     }
 
     function filterGroup(groupId, searchText) {
       const container = document.getElementById(groupId);
       const labels = container.getElementsByTagName('label');
-      const s = searchText.toLowerCase();
-      for (let i = 1; i < labels.length; i++) {
-        const text = labels[i].textContent.toLowerCase();
-        labels[i].style.display = text.includes(s) ? '' : 'none';
-      }
+      for (let i = 1; i < labels.length; i++) labels[i].style.display = labels[i].textContent.toLowerCase().includes(searchText.toLowerCase()) ? '' : 'none';
     }
 
     function openFilterModal() {
@@ -955,69 +930,73 @@ HTML = """
     }
 
     window.addEventListener('click', function(event) {
-      if (event.target == document.getElementById('filterModal'))
-        document.getElementById('filterModal').style.display = 'none';
-      if (event.target == document.getElementById('bookModal'))
-        closeModal();
+      if (event.target == document.getElementById('filterModal')) document.getElementById('filterModal').style.display = 'none';
+      if (event.target == document.getElementById('bookModal')) closeModal();
     });
 
-    // ---------- تحميل الكتب الأولية ----------
+    // ---------- تحميل الكتب الأولية (مع Loader) ----------
     window.addEventListener('DOMContentLoaded', () => {
+      showLoader("جاري تحميل الكتب المقترحة...");
       fetch('/initial_books')
         .then(res => res.json())
         .then(data => {
           currentResults = data;
           applyFiltersAndRender();
+          hideLoader();
         })
-        .catch(err => console.error('خطأ في تحميل الكتب المقترحة:', err));
+        .catch(err => {
+          console.error(err);
+          hideLoader();
+        });
     });
 
-    // ---------- البحث المباشر ----------
+    // ---------- البحث المباشر (مع Loader) ----------
     let debounceTimer;
     document.getElementById('searchInput').addEventListener('input', function() {
       clearTimeout(debounceTimer);
       const query = this.value.trim();
       if (query.length < 2) {
+        showLoader("جاري تحميل الكتب المقترحة...");
         fetch('/initial_books')
           .then(res => res.json())
           .then(data => {
             currentResults = data;
             applyFiltersAndRender();
+            hideLoader();
           });
         return;
       }
+      showLoader("جاري البحث عن الكتب...");
       debounceTimer = setTimeout(() => {
         fetch(`/search?q=${encodeURIComponent(query)}`)
           .then(res => res.json())
           .then(data => {
             currentResults = data;
             applyFiltersAndRender();
+            hideLoader();
           })
           .catch(err => {
             console.error(err);
             document.getElementById('results').innerHTML = '<div class="no-results">⚠️ خطأ في الاتصال</div>';
+            hideLoader();
           });
       }, 300);
     });
 
     function applyFiltersAndRender() {
       let filtered = [...currentResults];
-
       const cityCheckboxes = document.querySelectorAll('.city-item:checked');
       const libraryCheckboxes = document.querySelectorAll('.library-item:checked');
       const publisherCheckboxes = document.querySelectorAll('.publisher-item:checked');
       const cityAll = document.getElementById('city_all');
       const libraryAll = document.getElementById('library_all');
       const publisherAll = document.getElementById('publisher_all');
-
       const filterCities = (cityAll && !cityAll.checked) ? Array.from(cityCheckboxes).map(cb => cb.value) : null;
       const filterLibraries = (libraryAll && !libraryAll.checked) ? Array.from(libraryCheckboxes).map(cb => cb.value) : null;
       const filterPublishers = (publisherAll && !publisherAll.checked) ? Array.from(publisherCheckboxes).map(cb => cb.value) : null;
-
       if (filterCities) filtered = filtered.filter(b => filterCities.includes(b.city));
       if (filterLibraries) filtered = filtered.filter(b => filterLibraries.includes(b.library));
       if (filterPublishers) filtered = filtered.filter(b => filterPublishers.includes(b.publisher));
-
       const from = parseFloat(document.getElementById('priceFrom').value);
       const to = parseFloat(document.getElementById('priceTo').value);
       if (!isNaN(from) || !isNaN(to)) {
@@ -1029,18 +1008,13 @@ HTML = """
           return true;
         });
       }
-
       const searchQuery = document.getElementById('searchInput').value.trim();
-      const countText = searchQuery.length >= 2
-        ? `تم العثور على <strong>${filtered.length}</strong> كتاب`
-        : `<strong>${filtered.length}</strong> كتاب مقترح`;
+      const countText = searchQuery.length >= 2 ? `تم العثور على <strong>${filtered.length}</strong> كتاب` : `<strong>${filtered.length}</strong> كتاب مقترح`;
       document.getElementById('resultCount').innerHTML = countText;
-
       if (filtered.length === 0) {
         document.getElementById('results').innerHTML = '<div class="no-results">🔍 لا توجد نتائج مطابقة</div>';
         return;
       }
-
       const grouped = {};
       filtered.forEach(b => {
         const c = b.city || 'غير معروف', lib = b.library || 'مكتبة غير محددة';
@@ -1048,7 +1022,6 @@ HTML = """
         if (!grouped[c][lib]) grouped[c][lib] = [];
         grouped[c][lib].push(b);
       });
-
       let html = '';
       for (const city in grouped) {
         html += `<div class="city-card"><div class="city-name">📍 ${city}</div>`;
@@ -1073,16 +1046,13 @@ HTML = """
       document.getElementById('results').innerHTML = html;
     }
 
-    // ---------- Modal تفاصيل الكتاب ----------
     function openBookModal(encodedName) {
       const bookName = decodeURIComponent(encodedName);
       const book = currentResults.find(b => b.book_name === bookName);
       if (!book) return;
-
       const body = document.getElementById('modalBody');
       const imgSrc = book.cover_image || 'https://via.placeholder.com/150x220/1e293b/94a3b8?text=No+Cover';
       const googleBooksSearchUrl = `https://www.google.com/search?tbm=bks&q=${encodeURIComponent(bookName)}`;
-
       body.innerHTML = `
         <div class="modal-book-header">
           <img src="${imgSrc}" alt="${bookName}">
@@ -1100,16 +1070,17 @@ HTML = """
           </div>
         </div>
       `;
-
       document.getElementById('bookModal').style.display = 'block';
     }
 
-    // ---------- دالة Goodreads الذكية ----------
+    // دالة Goodreads مع الـ Loader
     function openGoodreads(encodedBookName) {
       const bookName = decodeURIComponent(encodedBookName);
+      showLoader("جاري البحث عن التقييمات...");
       fetch(`/get_goodreads_link?q=${encodeURIComponent(bookName)}`)
         .then(response => response.json())
         .then(data => {
+          hideLoader();
           if (data.url) {
             window.open(data.url, '_blank');
           } else {
@@ -1117,15 +1088,15 @@ HTML = """
           }
         })
         .catch(() => {
+          hideLoader();
           window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
         });
     }
 
     function shareBook(bookName) {
       const text = `📚 أنصحك بقراءة هذا الكتاب: "${bookName}"`;
-      if (navigator.share) {
-        navigator.share({ title: 'مشاركة كتاب', text: text }).catch(()=>{});
-      } else {
+      if (navigator.share) navigator.share({ title: 'مشاركة كتاب', text: text }).catch(()=>{});
+      else {
         navigator.clipboard.writeText(text).then(() => alert('تم نسخ اسم الكتاب!')).catch(() => prompt('انسخ اسم الكتاب:', text));
       }
     }
