@@ -457,7 +457,7 @@ def admin():
                   <td class="price">{{ b.price }}</td>
                   <td class="pub">{{ b.publisher }}</td>
                   <td class="isbn">{{ b.isbn }}</td>
-                  <td><img src="{{ b.cover_image or 'https://via.placeholder.com/40' }}" style="width:40px;height:auto;"></td>
+                  <td><img src="{{ b.cover_image or '/static/no-cover.png' }}" style="width:40px;height:auto;"></td>
                   <td class="actions">
                     <button onclick="editBook({{ b.id }})">✏️ تعديل</button>
                     <button class="danger" onclick="deleteBook({{ b.id }})">🗑️ حذف</button>
@@ -1025,8 +1025,8 @@ HTML = """
         for (const lib in grouped[city]) {
           html += `<div class="library-name">🏛 ${lib}</div><div class="books-grid">`;
           grouped[city][lib].forEach(book => {
-            const img = book.cover_image || 'https://via.placeholder.com/80x110/1e293b/94a3b8?text=No+Cover';
-            // ✅ التعديل الأول: استخدام book.id بدلاً من book.book_name
+            // ✅ تم استبدال placeholder الخارجي بمسار محلي
+            const img = book.cover_image || '/static/no-cover.png';
             html += `
               <div class="book-card" onclick="openBookModal(${book.id})">
                 <img src="${img}" alt="${book.book_name}" loading="lazy">
@@ -1044,12 +1044,12 @@ HTML = """
       document.getElementById('results').innerHTML = html;
     }
 
-    // ✅ التعديل الثاني: تحديث دالة openBookModal لتعمل بالمعرف bookId
     function openBookModal(bookId) {
       const book = currentResults.find(b => b.id == bookId);
       if (!book) return;
       const body = document.getElementById('modalBody');
-      const imgSrc = book.cover_image || 'https://via.placeholder.com/150x220/1e293b/94a3b8?text=No+Cover';
+      // ✅ تم استبدال placeholder الخارجي بمسار محلي
+      const imgSrc = book.cover_image || '/static/no-cover.png';
       const googleBooksSearchUrl = `https://www.google.com/search?tbm=bks&q=${encodeURIComponent(book.book_name)}`;
       body.innerHTML = `
         <div class="modal-book-header">
