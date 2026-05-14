@@ -1,219 +1,9 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, send_file
-import sqlite3
-import pandas as pd
-import os
-import urllib.parse
-from werkzeug.utils import secure_filename
-import requests
-from bs4 import BeautifulSoup
 import re
-from difflib import SequenceMatcher
-import io
+import urllib.parse
+with open("app.py", "r", encoding="utf-8") as f:
+    content = f.read()
 
-app = Flask(__name__, static_folder='out', static_url_path='/')
-# مسار قاعدة البيانات
-DATABASE = os.path.join(os.path.dirname(__file__), "books.db")
-
-# كلمة مرور لوحة التحكم (غيّرها كما تريد)
-ADMIN_PASSWORD = "hasanbook2026"
-
-# ========== تحويل تلقائي من Excel إلى SQLite عند أول تشغيل ==========
-def init_db():
-    if not os.path.exists(DATABASE):
-        try:
-            df = pd.read_excel("books.xlsx")
-            df = df.fillna("")
-            conn = sqlite3.connect(DATABASE)
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS books (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    book_name TEXT,
-                    city TEXT,
-                    library TEXT,
-                    price TEXT,
-                    publisher TEXT,
-                    cover_image TEXT,
-                    isbn TEXT
-                )
-            """)
-            for _, row in df.iterrows():
-                cursor.execute("""
-                    INSERT INTO books (book_name, city, library, price, publisher, cover_image, isbn)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    row.get("book_name", ""),
-                    row.get("city", ""),
-                    row.get("library", ""),
-                    str(row.get("price", "")),
-                    row.get("publisher", ""),
-                    row.get("cover_image", ""),
-                    str(row.get("isbn", ""))
-                ))
-            conn.commit()
-            conn.close()
-            print("✅ تم إنشاء books.db من books.xlsx بنجاح!")
-        except Exception as e:
-            print("❌ خطأ أثناء تحويل الإكسيل:", e)
-
-# تشغيل التهيئة
-init_db()
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# ========== البحث في قاعدة البيانات ==========
-def search(query):
-    conn = get_db()
-    results = conn.execute(
-        "SELECT * FROM books WHERE book_name LIKE ?",
-        (f'%{query}%',)
-    ).fetchall()
-    conn.close()
-    return [dict(row) for row in results]
-
-# ========== نقطة النهاية الذكية لـ Goodreads ==========
-@app.route("/get_goodreads_link")
-def get_goodreads_link():
-    book_name = request.args.get("q", "").strip()
-    if not book_name:
-        return jsonify({"error": "No query"}), 400
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    }
-    search_url = f"https://www.goodreads.com/search?q={requests.utils.quote(book_name)}"
-
-    try:
-        resp = requests.get(search_url, headers=headers, timeout=10)
-        if resp.status_code != 200:
-            return jsonify({"url": None, "message": "فشل الاتصال بـ Goodreads"})
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        table = soup.find("table", class_="tableList")
-        if not table:
-            return jsonify({"url": None, "message": "لم يتم العثور على نتائج"})
-
-        rows = table.find_all("tr")
-        best_match = None
-        best_score = -1
-
-        for row in rows:
-            link_tag = row.find("a", class_="bookTitle")
-            if not link_tag:
-                continue
-
-            title = link_tag.get_text(strip=True)
-            href = link_tag.get("href", "")
-            if not href.startswith("http"):
-                href = "https://www.goodreads.com" + href
-
-            # استخراج التقييم وعدد المقيمين
-            rating_span = None
-            for span in row.find_all("span"):
-                if "minirating" in span.get("class", []):
-                    rating_span = span
-                    break
-
-            rating = 0.0
-            ratings_count = 0
-            if rating_span:
-                text = rating_span.get_text()
-                rating_match = re.search(r'(\d+\.?\d*)\s*avg', text)
-                count_match = re.search(r'(\d[\d,]*)\s*ratings', text)
-                if rating_match:
-                    rating = float(rating_match.group(1))
-                if count_match:
-                    ratings_count = int(count_match.group(1).replace(',', ''))
-
-            # حساب درجة المطابقة: تشابه النص + التقييم + عدد المقيمين
-            similarity = SequenceMatcher(None, book_name.lower(), title.lower()).ratio()
-            score = similarity * 10 + (ratings_count / 1000) + (rating / 10)
-
-            if score > best_score:
-                best_score = score
-                best_match = href
-
-        if best_match:
-            return jsonify({"url": best_match})
-        else:
-            return jsonify({"url": None, "message": "لم يتم العثور على تطابق مناسب"})
-
-    except Exception as e:
-        print(f"Error fetching Goodreads link: {e}")
-        return jsonify({"url": None, "message": "حدث خطأ"})
-
-# ========== النسخ الاحتياطي ==========
-@app.route("/backup")
-def backup():
-    if request.args.get("password") != ADMIN_PASSWORD:
-        return "غير مصرح", 403
-    return send_file(DATABASE, as_attachment=True, download_name="books_backup.db")
-
-# ========== تصدير Excel ==========
-@app.route("/export_excel")
-def export_excel():
-    if request.args.get("password") != ADMIN_PASSWORD:
-        return "غير مصرح", 403
-
-    mode = request.args.get("mode", "all")
-    library_filter = request.args.get("library", "")
-    city_filter = request.args.get("city", "")
-
-    conn = get_db()
-    if mode == "library" and (library_filter or city_filter):
-        query = "SELECT * FROM books WHERE 1=1"
-        params = []
-        if library_filter:
-            query += " AND library = ?"
-            params.append(library_filter)
-        if city_filter:
-            query += " AND city = ?"
-            params.append(city_filter)
-            
-        query += " ORDER BY CAST(price AS REAL) DESC, id DESC"
-        rows = conn.execute(query, params).fetchall()
-        conn.close()
-        
-        df = pd.DataFrame([dict(row) for row in rows])
-        cols = ["id", "book_name", "city", "library", "price", "publisher", "isbn", "cover_image"]
-        df = df[cols] if all(col in df.columns for col in cols) else df
-
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            sheet_name = (library_filter or city_filter)[:31]
-            df.to_excel(writer, index=False, sheet_name=sheet_name)
-        output.seek(0)
-        filename = f"books_export.xlsx"
-        return send_file(output, as_attachment=True, download_name=filename,
-                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    # وضع all
-    libraries = [row[0] for row in conn.execute("SELECT DISTINCT library FROM books WHERE library != '' ORDER BY library").fetchall()]
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        for lib in libraries:
-            rows = conn.execute(
-                "SELECT * FROM books WHERE library = ? ORDER BY CAST(price AS REAL) DESC, id DESC",
-                (lib,)
-            ).fetchall()
-            if not rows:
-                continue
-            df = pd.DataFrame([dict(row) for row in rows])
-            cols = ["id", "book_name", "city", "library", "price", "publisher", "isbn", "cover_image"]
-            df = df[cols] if all(col in df.columns for col in cols) else df
-            sheet_name = lib[:31]
-            df.to_excel(writer, index=False, sheet_name=sheet_name)
-    conn.close()
-    output.seek(0)
-    filename = "books_all_libraries.xlsx"
-    return send_file(output, as_attachment=True, download_name=filename,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-# ========== لوحة التحكم ==========
-@app.route("/admin", methods=["GET", "POST"])
+new_admin_code = '''@app.route("/admin", methods=["GET", "POST"])
 def admin():
     if request.args.get("password") != ADMIN_PASSWORD:
         return render_template_string("""
@@ -297,7 +87,7 @@ def admin():
                 request.form["price"], request.form["publisher"],
                 request.form["cover_image"], request.form["isbn"]))
             conn.commit()
-            return redirect(f"/admin?password={ADMIN_PASSWORD}&library={selected_library}&city={selected_city}&msg={urllib.parse.quote('تمت الإضافة بنجاح')}")
+            return redirect(f"/admin?password={ADMIN_PASSWORD}&library={selected_library}&city={selected_city}&msg=تمت الإضافة بنجاح")
 
         if "file" in request.files and request.files["file"].filename != "":
             file = request.files["file"]
@@ -362,7 +152,7 @@ def admin():
     books_list = [dict(row) for row in conn.execute(query, params).fetchall()]
     conn.close()
 
-    return render_template_string("""
+    html_content = """
     <!DOCTYPE html>
     <html dir="rtl">
     <head>
@@ -680,48 +470,15 @@ def admin():
     selected_library=selected_library, selected_city=selected_city,
     page=page, total_pages=total_pages, filtered_count=filtered_count,
     admin_password=ADMIN_PASSWORD)
+'''
 
-@app.route("/", defaults={'path': ''})
-@app.route("/<path:path>")
-def serve_nextjs(path):
-    # لا تتدخل في مسارات API التي قد تسبق هذا المسار
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_file(os.path.join(app.static_folder, path))
-    elif path != "" and os.path.exists(os.path.join(app.static_folder, f"{path}.html")):
-        return send_file(os.path.join(app.static_folder, f"{path}.html"))
-    elif path != "" and os.path.exists(os.path.join(app.static_folder, f"{path}/index.html")):
-        return send_file(os.path.join(app.static_folder, f"{path}/index.html"))
-    else:
-        return send_file(os.path.join(app.static_folder, 'index.html'))
+start_idx = content.find('@app.route("/admin", methods=["GET", "POST"])')
+end_idx = content.find('@app.route("/")')
 
-@app.route("/search")
-def api():
-    q = request.args.get("q", "")
-    return jsonify(search(q))
-
-@app.route("/filters_data")
-def filters_data():
-    conn = get_db()
-    cities = [row[0] for row in conn.execute("SELECT DISTINCT city FROM books WHERE city != '' ORDER BY city").fetchall()]
-    libraries = [row[0] for row in conn.execute("SELECT DISTINCT library FROM books WHERE library != '' ORDER BY library").fetchall()]
-    publishers = [row[0] for row in conn.execute("SELECT DISTINCT publisher FROM books WHERE publisher != '' ORDER BY publisher").fetchall()]
-    min_price = conn.execute("SELECT MIN(CAST(price AS REAL)) FROM books WHERE price != '' AND price IS NOT NULL").fetchone()[0] or 0
-    max_price = conn.execute("SELECT MAX(CAST(price AS REAL)) FROM books WHERE price != '' AND price IS NOT NULL").fetchone()[0] or 0
-    conn.close()
-    return jsonify({
-        "cities": cities,
-        "libraries": libraries,
-        "publishers": publishers,
-        "min_price": min_price,
-        "max_price": max_price
-    })
-
-@app.route("/initial_books")
-def initial_books():
-    conn = get_db()
-    books = conn.execute("SELECT * FROM books ORDER BY RANDOM() LIMIT 24").fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in books])
-
-if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+if start_idx != -1 and end_idx != -1:
+    new_content = content[:start_idx] + new_admin_code + '\n' + content[end_idx:]
+    with open("app.py", "w", encoding="utf-8") as f:
+        f.write(new_content)
+    print("Done")
+else:
+    print("Error finding boundaries")

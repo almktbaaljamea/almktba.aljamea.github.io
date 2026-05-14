@@ -112,22 +112,46 @@ function ExploreContent() {
       </div>
 
       {selectedBook && (
-        <div className="modal-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center'}} onClick={() => setSelectedBook(null)}>
-          <div className="modal-content glass-panel" style={{background: '#1e293b', padding: '25px', borderRadius: '20px', width: '90%', maxWidth: '650px', position: 'relative'}} onClick={e => e.stopPropagation()}>
-            <span style={{position: 'absolute', top: '10px', left: '20px', fontSize: '30px', cursor: 'pointer', color: '#94a3b8'}} onClick={() => setSelectedBook(null)}>&times;</span>
-            <div style={{display: 'flex', gap: '20px', flexWrap: 'wrap'}}>
-              <img src={selectedBook.cover_image || '/static/no-cover.png'} alt={selectedBook.book_name} style={{width: '150px', height: '220px', objectFit: 'cover', borderRadius: '12px'}} />
-              <div style={{flex: 1, minWidth: '250px'}}>
-                <h2 style={{color: '#fbbf24', marginBottom: '8px'}}>{selectedBook.book_name}</h2>
-                <p style={{color: '#cbd5e1', margin: '6px 0'}}>📘 الناشر: {selectedBook.publisher || 'غير معروف'}</p>
-                <p style={{color: '#cbd5e1', margin: '6px 0'}}>🏛 المكتبة: {selectedBook.library || 'غير محددة'}</p>
-                <p style={{color: '#cbd5e1', margin: '6px 0'}}>📍 المدينة: {selectedBook.city || 'غير محددة'}</p>
-                <p style={{color: '#4ade80', fontSize: '1.3em', fontWeight: 'bold', margin: '10px 0'}}>💰 السعر: {selectedBook.price || 'غير متوفر'}</p>
-                
-                <div style={{marginTop: '15px', padding: '12px', background: '#0f172a', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-                  <button onClick={() => handleOpenGoodreads(selectedBook.book_name)} style={{padding: '12px', background: '#382110', color: '#f3d9b1', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '1em'}}>📊 تقييمات ومراجعات Goodreads</button>
-                  <a href={`https://www.google.com/search?tbm=bks&q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" style={{padding: '12px', background: '#2563eb', color: 'white', borderRadius: '10px', textDecoration: 'none', textAlign: 'center', fontSize: '1em'}}>📖 آراء Google Books</a>
+        <div className="book-modal-overlay" onClick={() => setSelectedBook(null)}>
+          <div className="book-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="book-modal-close" onClick={() => setSelectedBook(null)}>&times;</div>
+            
+            <div className="book-modal-image-wrapper">
+              <img src={selectedBook.cover_image || '/static/no-cover.png'} alt={selectedBook.book_name} className="book-modal-image" />
+            </div>
+            
+            <div className="book-modal-info">
+              <h2 className="book-modal-title">{selectedBook.book_name}</h2>
+              <div className="book-modal-author">الناشر: {selectedBook.publisher || 'غير معروف'}</div>
+              
+              <div className="book-modal-details-grid">
+                <div className="detail-item">
+                  <span className="detail-label">🏛 المكتبة</span>
+                  <span className="detail-value">{selectedBook.library || 'غير محددة'}</span>
                 </div>
+                <div className="detail-item">
+                  <span className="detail-label">📍 المدينة</span>
+                  <span className="detail-value">{selectedBook.city || 'غير محددة'}</span>
+                </div>
+                {selectedBook.isbn && selectedBook.isbn !== 'nan' && selectedBook.isbn !== '' && (
+                  <div className="detail-item" style={{gridColumn: '1 / -1'}}>
+                    <span className="detail-label">🔢 الترقيم الدولي (ISBN)</span>
+                    <span className="detail-value" style={{ direction: 'ltr', textAlign: 'right' }}>{selectedBook.isbn}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="book-modal-price">
+                {selectedBook.price || 'غير متوفر'} <span>سعر البيع</span>
+              </div>
+              
+              <div className="book-modal-actions">
+                <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)}>
+                  📊 تقييمات Goodreads
+                </button>
+                <a className="action-btn btn-google" href={`https://www.google.com/search?tbm=bks&q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" rel="noopener noreferrer">
+                  📖 ابحث في Google Books
+                </a>
               </div>
             </div>
           </div>
