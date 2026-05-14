@@ -6,9 +6,8 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="container navbar-container">
-        <Link href="/" className="navbar-logo">
-          <span className="logo-icon">📚</span>
-          <span className="logo-text">المكتبة الجامعة</span>
+        <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center' }}>
+          <img src="/logo.png" alt="شعار المكتبة الجامعة" style={{ height: '50px', width: 'auto' }} />
         </Link>
         
         <div className="navbar-links">

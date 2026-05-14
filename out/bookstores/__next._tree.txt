@@ -1,3 +1,4 @@
 :HL["/_next/static/chunks/0smlnvw1evk8j.css","style"]
 :HL["/_next/static/chunks/0x1bl88yenpoq.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"bookstores","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}},"staleTime":300,"buildId":"FSuflSuQ0cNWPXVaWKmdj"}
+:HL["/logo.png","image"]
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"bookstores","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}},"staleTime":300,"buildId":"opyKTGIrY-9WYkyBFdyVr"}
