@@ -9,9 +9,9 @@ export default function Home() {
       <section className="hero">
         <div className="container hero-container">
           <div className="hero-content animate-fade-in">
-            <h1 className="hero-title">البحث عن الكتب العربية في تركيا صار أسهل!</h1>
+            <h1 className="hero-title">المكتبة الجامعة</h1>
             <p className="hero-subtitle">
-              منصة تجمع المكتبات العربية في مكان واحد، قارن الأسعار، وتعرف على أماكن التوفر بسرعة ووضوح.
+              المكتبة التي جَمَعَت كل المكتبات وكل الكتب في مجمع واحد. ابحث، قارن الأسعار، وتعرّف على أماكن توفر كتبك المفضلة بسرعة ووضوح.
             </p>
             <SearchBar placeholder="ابحث باسم الكتاب، المؤلف، أو دار النشر..." />
             <div className="hero-tags">

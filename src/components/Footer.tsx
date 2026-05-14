@@ -6,9 +6,9 @@ export default function Footer() {
     <footer className="footer">
       <div className="container footer-container">
         <div className="footer-section">
-          <h3 className="footer-title">مكتباتنا</h3>
+          <h3 className="footer-title">المكتبة الجامعة</h3>
           <p className="footer-text">
-            منصة رقمية تهدف إلى جمع المكتبات العربية في تركيا لتسهيل وصول القارئ إلى الكتب المنظمة.
+            المكتبة التي جَمَعَت كل المكتبات وكل الكتب في مجمع واحد. وجهتك الأولى للعثور على أي كتاب من أي مكتبة.
           </p>
         </div>
         
@@ -32,7 +32,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="footer-bottom">
-        <p>جميع الحقوق محفوظة &copy; {new Date().getFullYear()} - منصة مكتباتنا</p>
+        <p>جميع الحقوق محفوظة &copy; {new Date().getFullYear()} - المكتبة الجامعة</p>
       </div>
     </footer>
   );

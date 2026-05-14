@@ -7,7 +7,7 @@ export default function Navbar() {
       <div className="container navbar-container">
         <Link href="/" className="navbar-logo">
           <span className="logo-icon">📚</span>
-          <span className="logo-text">مكتباتنا</span>
+          <span className="logo-text">المكتبة الجامعة</span>
         </Link>
         
         <div className="navbar-links">
