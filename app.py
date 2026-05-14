@@ -362,7 +362,7 @@ def admin():
     books_list = [dict(row) for row in conn.execute(query, params).fetchall()]
     conn.close()
 
-    html_content = """
+    return render_template_string("""
     <!DOCTYPE html>
     <html dir="rtl">
     <head>
