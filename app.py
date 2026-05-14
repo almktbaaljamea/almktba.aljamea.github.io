@@ -10,7 +10,7 @@ import re
 from difflib import SequenceMatcher
 import io
 
-app = Flask(__name__, static_folder='out', static_url_path='/')
+app = Flask(__name__, static_folder='out')
 # مسار قاعدة البيانات
 DATABASE = os.path.join(os.path.dirname(__file__), "books.db")
 
@@ -685,12 +685,13 @@ def admin():
 @app.route("/<path:path>")
 def serve_nextjs(path):
     # لا تتدخل في مسارات API التي قد تسبق هذا المسار
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_file(os.path.join(app.static_folder, path))
-    elif path != "" and os.path.exists(os.path.join(app.static_folder, f"{path}.html")):
-        return send_file(os.path.join(app.static_folder, f"{path}.html"))
-    elif path != "" and os.path.exists(os.path.join(app.static_folder, f"{path}/index.html")):
-        return send_file(os.path.join(app.static_folder, f"{path}/index.html"))
+    full_path = os.path.join(app.static_folder, path)
+    if path != "" and os.path.isfile(full_path):
+        return send_file(full_path)
+    elif path != "" and os.path.isfile(f"{full_path}.html"):
+        return send_file(f"{full_path}.html")
+    elif path != "" and os.path.isfile(os.path.join(full_path, "index.html")):
+        return send_file(os.path.join(full_path, "index.html"))
     else:
         return send_file(os.path.join(app.static_folder, 'index.html'))
 
