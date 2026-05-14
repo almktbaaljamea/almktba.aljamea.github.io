@@ -160,23 +160,33 @@ def export_excel():
 
     mode = request.args.get("mode", "all")
     library_filter = request.args.get("library", "")
+    city_filter = request.args.get("city", "")
 
     conn = get_db()
-    if mode == "library" and library_filter:
-        rows = conn.execute(
-            "SELECT * FROM books WHERE library = ? ORDER BY CAST(price AS REAL) DESC, id DESC",
-            (library_filter,)
-        ).fetchall()
+    if mode == "library" and (library_filter or city_filter):
+        query = "SELECT * FROM books WHERE 1=1"
+        params = []
+        if library_filter:
+            query += " AND library = ?"
+            params.append(library_filter)
+        if city_filter:
+            query += " AND city = ?"
+            params.append(city_filter)
+            
+        query += " ORDER BY CAST(price AS REAL) DESC, id DESC"
+        rows = conn.execute(query, params).fetchall()
         conn.close()
+        
         df = pd.DataFrame([dict(row) for row in rows])
         cols = ["id", "book_name", "city", "library", "price", "publisher", "isbn", "cover_image"]
         df = df[cols] if all(col in df.columns for col in cols) else df
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name=library_filter[:31])
+            sheet_name = (library_filter or city_filter)[:31]
+            df.to_excel(writer, index=False, sheet_name=sheet_name)
         output.seek(0)
-        filename = f"books_{library_filter}.xlsx"
+        filename = f"books_export.xlsx"
         return send_file(output, as_attachment=True, download_name=filename,
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
@@ -207,20 +217,37 @@ def export_excel():
 def admin():
     if request.args.get("password") != ADMIN_PASSWORD:
         return render_template_string("""
-            <html dir="rtl"><body style="background:#0f172a;color:white;font-family:sans-serif;padding:20px">
-            <h2>🔐 أدخل كلمة المرور</h2>
-            <form method="get">
-                <input type="password" name="password" placeholder="كلمة المرور" style="padding:10px;width:200px">
-                <button type="submit" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer">دخول</button>
-            </form>
+            <html dir="rtl"><body style="background:#0f172a;color:white;font-family:sans-serif;padding:20px;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;">
+            <div style="background:rgba(30, 41, 59, 0.7);backdrop-filter:blur(10px);padding:40px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+                <h2 style="color:#fbbf24;margin-bottom:20px;">🔐 لوحة تحكم المكتبة الجامعة</h2>
+                <form method="get">
+                    <input type="password" name="password" placeholder="أدخل كلمة المرور" style="padding:12px;width:250px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:white;outline:none;">
+                    <br><br>
+                    <button type="submit" style="padding:12px 30px;background:#2563eb;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold;transition:0.3s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">دخول</button>
+                </form>
+            </div>
             </body></html>
         """)
 
     conn = get_db()
-    library_names = [row["library"] for row in conn.execute(
-        "SELECT DISTINCT library FROM books WHERE library != '' ORDER BY library"
-    ).fetchall()]
+    
+    # إحصائيات سريعة
+    total_books = conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]
+    total_libraries = conn.execute("SELECT COUNT(DISTINCT library) FROM books WHERE library != ''").fetchone()[0]
+    total_cities = conn.execute("SELECT COUNT(DISTINCT city) FROM books WHERE city != ''").fetchone()[0]
+    total_publishers = conn.execute("SELECT COUNT(DISTINCT publisher) FROM books WHERE publisher != ''").fetchone()[0]
+    
+    # جلب قوائم الفلترة
+    library_names = [row["library"] for row in conn.execute("SELECT DISTINCT library FROM books WHERE library != '' ORDER BY library").fetchall()]
+    city_names = [row["city"] for row in conn.execute("SELECT DISTINCT city FROM books WHERE city != '' ORDER BY city").fetchall()]
+    
     selected_library = request.args.get("library", "")
+    selected_city = request.args.get("city", "")
+    try:
+        page = int(request.args.get("page", 1))
+    except ValueError:
+        page = 1
+    per_page = 50
 
     libraries = []
     for lib in library_names:
@@ -234,31 +261,25 @@ def admin():
                 break
         libraries.append({'name': lib, 'logo': logo_url})
 
-    if selected_library:
-        all_books = conn.execute(
-            "SELECT * FROM books WHERE library = ? ORDER BY id DESC",
-            (selected_library,)
-        ).fetchall()
-    else:
-        all_books = conn.execute(
-            "SELECT * FROM books ORDER BY id DESC"
-        ).fetchall()
-    books_list = [dict(row) for row in all_books]
-    conn.close()
-
     if request.method == "POST":
         action = request.form.get("action", "")
+        
         if action == "delete":
             book_id = request.form.get("id")
-            conn = get_db()
             conn.execute("DELETE FROM books WHERE id = ?", (book_id,))
             conn.commit()
-            conn.close()
-            return jsonify({"status": "ok", "msg": "تم الحذف"})
+            return jsonify({"status": "ok", "msg": "تم الحذف بنجاح"})
+            
+        if action == "bulk_delete":
+            ids = request.form.getlist("ids[]")
+            if ids:
+                placeholders = ','.join('?' * len(ids))
+                conn.execute(f"DELETE FROM books WHERE id IN ({placeholders})", ids)
+                conn.commit()
+            return jsonify({"status": "ok", "msg": f"تم حذف {len(ids)} كتاب بنجاح"})
 
         if action == "edit":
             book_id = request.form.get("id")
-            conn = get_db()
             conn.execute("""UPDATE books SET 
                 book_name=?, city=?, library=?, price=?, publisher=?, cover_image=?, isbn=?
                 WHERE id=?""", (
@@ -267,8 +288,16 @@ def admin():
                 request.form["cover_image"], request.form["isbn"],
                 book_id))
             conn.commit()
-            conn.close()
             return jsonify({"status": "ok", "msg": "تم التعديل"})
+
+        if action == "add":
+            conn.execute("""INSERT INTO books (book_name, city, library, price, publisher, cover_image, isbn)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""", (
+                request.form["book_name"], request.form["city"], request.form["library"],
+                request.form["price"], request.form["publisher"],
+                request.form["cover_image"], request.form["isbn"]))
+            conn.commit()
+            return redirect(f"/admin?password={ADMIN_PASSWORD}&library={selected_library}&city={selected_city}&msg={urllib.parse.quote('تمت الإضافة بنجاح')}")
 
         if "file" in request.files and request.files["file"].filename != "":
             file = request.files["file"]
@@ -290,7 +319,6 @@ def admin():
                         df[col] = ""
                 if final_library:
                     df["library"] = final_library
-                conn = get_db()
                 count = 0
                 for _, row in df.iterrows():
                     book_name = row.get("book_name", "")
@@ -308,208 +336,303 @@ def admin():
                             row.get("cover_image", ""), str(row.get("isbn", ""))))
                         count += 1
                 conn.commit()
-                conn.close()
                 os.remove(filepath)
                 msg = f"✅ تم استيراد {count} كتاباً جديداً!"
             except Exception as e:
                 msg = f"❌ خطأ أثناء الاستيراد: {str(e)}"
-            return render_template_string("<h2>{{ msg }}</h2><a href='/admin?password=" + ADMIN_PASSWORD + "&library=" + selected_library + "'>رجوع</a>", msg=msg)
+            return redirect(f"/admin?password={ADMIN_PASSWORD}&library={selected_library}&city={selected_city}&msg={urllib.parse.quote(msg)}")
 
-        # إضافة كتاب واحد
-        conn = get_db()
-        conn.execute("""INSERT INTO books (book_name, city, library, price, publisher, cover_image, isbn)
-            VALUES (?, ?, ?, ?, ?, ?, ?)""", (
-            request.form["book_name"], request.form["city"], request.form["library"],
-            request.form["price"], request.form["publisher"],
-            request.form["cover_image"], request.form["isbn"]))
-        conn.commit()
-        conn.close()
-        return redirect(f"/admin?password={ADMIN_PASSWORD}&library={selected_library}&msg=تمت الإضافة")
+    # بناء الاستعلام
+    query = "SELECT * FROM books WHERE 1=1"
+    params = []
+    
+    if selected_library:
+        query += " AND library = ?"
+        params.append(selected_library)
+    if selected_city:
+        query += " AND city = ?"
+        params.append(selected_city)
+        
+    query += " ORDER BY id DESC"
+    
+    filtered_count = conn.execute(query.replace("SELECT *", "SELECT COUNT(*)"), params).fetchone()[0]
+    total_pages = (filtered_count + per_page - 1) // per_page if filtered_count > 0 else 1
+    
+    query += f" LIMIT {per_page} OFFSET {(page - 1) * per_page}"
+    books_list = [dict(row) for row in conn.execute(query, params).fetchall()]
+    conn.close()
 
-    # ---------- عرض الصفحة ----------
-    return render_template_string("""
+    html_content = """
     <!DOCTYPE html>
     <html dir="rtl">
     <head>
       <meta charset="UTF-8">
       <title>لوحة التحكم – المكتبة الجامعة</title>
       <style>
-        body { background:#0f172a; color:#e2e8f0; font-family:sans-serif; padding:20px; margin:0 }
-        h2 { color:#fbbf24 }
-        .top-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px }
-        .main-layout { display:flex; gap:20px; margin-top:20px; flex-wrap:wrap }
-        .sidebar { background:#1e293b; border-radius:16px; padding:15px; min-width:200px; flex:0 0 220px }
-        .sidebar h3 { color:#fbbf24; margin-bottom:10px }
-        .sidebar a { display:flex; align-items:center; gap:8px; padding:8px 10px; color:#cbd5e1; text-decoration:none; border-radius:8px; margin:3px 0 }
-        .sidebar a.active, .sidebar a:hover { background:#2563eb; color:white }
-        .content { flex:1; min-width:0 }
-        .panel { background:#1e293b; border-radius:16px; padding:20px; margin-bottom:20px }
-        input,select,button { padding:10px; margin:5px 0; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; width:100%; box-sizing:border-box }
-        button { background:#2563eb; cursor:pointer; border:none }
-        button.danger { background:#dc2626 }
-        button.success { background:#059669 }
-        .filter-group { display:flex; gap:10px; flex-wrap:wrap }
-        .filter-group input { flex:1; min-width:150px }
-        table { width:100%; border-collapse:collapse; margin-top:10px; font-size:0.85em }
-        th,td { border:1px solid #334155; padding:8px; text-align:right }
-        th { background:#0f172a; color:#fbbf24 }
-        .actions { display:flex; gap:5px }
-        .actions button { width:auto; padding:4px 12px; font-size:0.8em }
-        .counter { margin:10px 0 }
-        .import-options { margin-top:10px; display:none }
+        :root { --bg:#0f172a; --panel:rgba(30,41,59,0.7); --border:rgba(255,255,255,0.1); --text:#e2e8f0; --accent:#fbbf24; --primary:#2563eb; --danger:#ef4444; --success:#10b981; }
+        body { background:var(--bg); color:var(--text); font-family:sans-serif; padding:20px; margin:0; }
+        h1, h2, h3 { color:var(--accent); margin-top:0; }
+        a { text-decoration:none; color:inherit; }
+        
+        .glass { background:var(--panel); backdrop-filter:blur(10px); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.1); }
+        
+        .top-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:20px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px; margin-bottom:20px; }
+        .stat-card { text-align:center; padding:15px; border-radius:12px; background:rgba(255,255,255,0.05); }
+        .stat-card h4 { margin:0 0 5px 0; color:#cbd5e1; font-size:0.9em; }
+        .stat-card .num { font-size:1.8em; font-weight:bold; color:var(--accent); }
+        
+        .main-layout { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
+        .sidebar { flex:0 0 250px; display:flex; flex-direction:column; gap:20px; }
+        .content { flex:1; min-width:0; }
+        
+        .filter-list { max-height:400px; overflow-y:auto; padding-right:5px; }
+        .filter-list::-webkit-scrollbar { width:6px; }
+        .filter-list::-webkit-scrollbar-thumb { background:var(--primary); border-radius:3px; }
+        
+        .nav-item { display:flex; align-items:center; gap:10px; padding:10px; border-radius:10px; margin-bottom:5px; transition:0.2s; }
+        .nav-item:hover { background:rgba(255,255,255,0.1); }
+        .nav-item.active { background:var(--primary); color:white; }
+        
+        input, select, button { width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(15,23,42,0.8); color:white; outline:none; font-family:inherit; box-sizing:border-box; margin-bottom:10px; }
+        input:focus, select:focus { border-color:var(--primary); }
+        
+        button { cursor:pointer; font-weight:bold; background:var(--primary); border:none; transition:0.2s; }
+        button:hover { filter:brightness(1.1); }
+        button.danger { background:var(--danger); }
+        button.success { background:var(--success); }
+        
+        table { width:100%; border-collapse:collapse; font-size:0.9em; margin-top:15px; }
+        th, td { padding:12px; text-align:right; border-bottom:1px solid var(--border); }
+        th { color:var(--accent); background:rgba(0,0,0,0.2); }
+        tr:hover { background:rgba(255,255,255,0.02); }
+        
+        .actions { display:flex; gap:5px; }
+        .actions button { padding:6px 10px; font-size:0.85em; margin:0; width:auto; }
+        
+        .pagination { display:flex; gap:5px; justify-content:center; margin-top:20px; flex-wrap:wrap; }
+        .pagination a { padding:8px 12px; background:var(--panel); border:1px solid var(--border); border-radius:8px; }
+        .pagination a.active { background:var(--primary); border-color:var(--primary); }
+        
+        #msg-box { display:none; padding:15px; background:var(--success); border-radius:10px; margin-bottom:20px; text-align:center; font-weight:bold; }
       </style>
     </head>
     <body>
-      <div class="top-bar">
-        <h2>📚 لوحة تحكم المكتبة الجامعة</h2>
-        <div style="display:flex; gap:10px; align-items:center;">
-          <a href="/" target="_blank" style="color:#38bdf8">عرض الموقع</a>
-          <a href="/backup?password={{ admin_password }}" style="color:#fbbf24; background:#1e293b; padding:6px 12px; border-radius:8px; text-decoration:none;">🗃️ نسخة احتياطية</a>
-          <a href="/export_excel?password={{ admin_password }}&mode=all" style="color:#fbbf24; background:#1e293b; padding:6px 12px; border-radius:8px; text-decoration:none;">📥 تصدير Excel (الكل)</a>
-          {% if selected_library %}
-          <a href="/export_excel?password={{ admin_password }}&mode=library&library={{ selected_library }}" style="color:#fbbf24; background:#1e293b; padding:6px 12px; border-radius:8px; text-decoration:none;">📥 تصدير Excel ({{ selected_library }})</a>
-          {% endif %}
+      <div class="top-bar glass">
+        <h2 style="margin:0;">📚 المكتبة الجامعة - الإدارة</h2>
+        <div style="display:flex; gap:10px;">
+          <a href="/" target="_blank" style="padding:10px 15px; background:rgba(255,255,255,0.1); border-radius:8px;">🌍 عرض الموقع</a>
+          <a href="/backup?password={{ admin_password }}" style="padding:10px 15px; background:var(--success); border-radius:8px;">🗃️ نسخة احتياطية</a>
+          <a href="/export_excel?password={{ admin_password }}&mode=all" style="padding:10px 15px; background:var(--primary); border-radius:8px;">📥 تصدير الكل</a>
         </div>
       </div>
-      <div class="counter">عدد الكتب المعروضة: {{ books_count }}</div>
+      
+      <div id="msg-box"></div>
+
+      <div class="stats-grid glass">
+        <div class="stat-card"><h4>إجمالي الكتب</h4><div class="num">{{ total_books }}</div></div>
+        <div class="stat-card"><h4>إجمالي المكتبات</h4><div class="num">{{ total_libraries }}</div></div>
+        <div class="stat-card"><h4>إجمالي المدن</h4><div class="num">{{ total_cities }}</div></div>
+        <div class="stat-card"><h4>دور النشر</h4><div class="num">{{ total_publishers }}</div></div>
+      </div>
 
       <div class="main-layout">
+        <!-- الشريط الجانبي الفلاتر -->
         <div class="sidebar">
-          <h3>🏛 المكتبات</h3>
-          <a href="/admin?password={{ admin_password }}" class="{{ 'active' if not selected_library else '' }}">📋 الكل</a>
-          {% for lib in libraries %}
-          <a href="/admin?password={{ admin_password }}&library={{ lib.name }}" class="{{ 'active' if selected_library == lib.name else '' }}">
-            {% if lib.logo %}
-            <img src="/static/{{ lib.logo }}" style="width:28px; height:28px; border-radius:6px; object-fit:cover;" alt="">
-            {% else %}
-            <span style="width:28px; height:28px; border-radius:6px; background:#334155; display:inline-flex; align-items:center; justify-content:center;">🏛️</span>
-            {% endif %}
-            <span>{{ lib.name }}</span>
-          </a>
-          {% endfor %}
+          <div class="glass">
+            <h3>🏛 المكتبات</h3>
+            <a href="/admin?password={{ admin_password }}&city={{ selected_city }}" class="nav-item {{ 'active' if not selected_library else '' }}">📋 الكل</a>
+            <div class="filter-list">
+              {% for lib in libraries %}
+              <a href="/admin?password={{ admin_password }}&library={{ lib.name }}&city={{ selected_city }}" class="nav-item {{ 'active' if selected_library == lib.name else '' }}">
+                <span>{{ lib.name }}</span>
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="glass">
+            <h3>📍 المدن</h3>
+            <a href="/admin?password={{ admin_password }}&library={{ selected_library }}" class="nav-item {{ 'active' if not selected_city else '' }}">📋 الكل</a>
+            <div class="filter-list" style="max-height:200px;">
+              {% for city in city_names %}
+              <a href="/admin?password={{ admin_password }}&city={{ city }}&library={{ selected_library }}" class="nav-item {{ 'active' if selected_city == city else '' }}">
+                <span>{{ city }}</span>
+              </a>
+              {% endfor %}
+            </div>
+          </div>
         </div>
 
         <div class="content">
-          <!-- نماذج الإضافة والاستيراد -->
-          <div style="display:flex; gap:20px; flex-wrap:wrap;">
-            <div class="panel" style="flex:1; min-width:250px;">
+          <!-- الإضافة والاستيراد -->
+          <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+            <div class="glass" style="flex:1; min-width:300px;">
               <h3>➕ إضافة كتاب واحد</h3>
               <form method="POST">
-                <input name="book_name" placeholder="اسم الكتاب" required>
-                <input name="city" placeholder="المدينة">
-                <input name="library" placeholder="المكتبة">
-                <input name="price" placeholder="السعر">
-                <input name="publisher" placeholder="دار النشر">
-                <input name="cover_image" placeholder="رابط صورة الغلاف">
-                <input name="isbn" placeholder="ISBN">
-                <button type="submit">إضافة</button>
+                <input type="hidden" name="action" value="add">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                  <input name="book_name" placeholder="اسم الكتاب" required style="grid-column:span 2">
+                  <input name="library" placeholder="المكتبة">
+                  <input name="city" placeholder="المدينة">
+                  <input name="publisher" placeholder="دار النشر">
+                  <input name="price" placeholder="السعر">
+                  <input name="isbn" placeholder="ISBN">
+                  <input name="cover_image" placeholder="رابط الغلاف">
+                </div>
+                <button type="submit">إضافة الكتاب</button>
               </form>
             </div>
-
-            <div class="panel" style="flex:1; min-width:250px;">
-              <h3>📁 استيراد جماعي ذكي</h3>
+            
+            <div class="glass" style="flex:1; min-width:300px;">
+              <h3>📁 استيراد جماعي ذكي (Excel/CSV)</h3>
               <form method="POST" enctype="multipart/form-data">
-                <label>اختر ملف (Excel أو CSV):</label>
-                <input type="file" name="file" accept=".xlsx,.xls,.csv" required onchange="showImportOptions()">
-                <div class="import-options" id="importOptions">
-                  <label>اختر مكتبة موجودة:</label>
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+                <div style="display:flex; gap:10px;">
                   <select name="target_library">
-                    <option value="">-- بدون تحديد (تستخدم الملف) --</option>
+                    <option value="">-- ربط بمكتبة موجودة --</option>
                     {% for lib in libraries %}
                     <option value="{{ lib.name }}">{{ lib.name }}</option>
                     {% endfor %}
                   </select>
-                  <label>أو مكتبة جديدة:</label>
-                  <input type="text" name="new_library" placeholder="اسم المكتبة الجديدة">
+                  <input type="text" name="new_library" placeholder="أو مكتبة جديدة">
                 </div>
                 <button type="submit" class="success">استيراد الملف</button>
               </form>
-              <p style="font-size:0.8em">الأعمدة المطلوبة: book_name, city, library, price, publisher, cover_image, isbn</p>
-            </div>
-          </div>
-
-          <!-- الفلتر السريع -->
-          <div class="panel">
-            <h3>🔍 فلتر سريع</h3>
-            <div class="filter-group">
-              <input type="text" id="filterBookName" placeholder="اسم الكتاب" oninput="applyFilters()">
-              <input type="text" id="filterLibrary" placeholder="المكتبة" oninput="applyFilters()">
-              <input type="text" id="filterPublisher" placeholder="دار النشر" oninput="applyFilters()">
+              <p style="font-size:0.8em; color:#94a3b8; margin-top:10px;">الأعمدة المطلوبة: book_name, city, library, price, publisher, cover_image, isbn</p>
             </div>
           </div>
 
           <!-- جدول الكتب -->
-          <div style="margin-top:20px; overflow-x:auto;">
-            <table id="booksTable">
-              <thead>
-                <tr>
-                  <th>ID</th><th>اسم الكتاب</th><th>المدينة</th><th>المكتبة</th><th>السعر</th><th>الناشر</th><th>ISBN</th><th>صورة</th><th>إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for b in books %}
-                <tr id="row-{{ b.id }}">
-                  <td>{{ b.id }}</td>
-                  <td class="name">{{ b.book_name }}</td>
-                  <td class="city">{{ b.city }}</td>
-                  <td class="lib">{{ b.library }}</td>
-                  <td class="price">{{ b.price }}</td>
-                  <td class="pub">{{ b.publisher }}</td>
-                  <td class="isbn">{{ b.isbn }}</td>
-                  <td><img src="{{ b.cover_image or '/static/no-cover.png' }}" style="width:40px;height:auto;"></td>
-                  <td class="actions">
-                    <button onclick="editBook({{ b.id }})">✏️ تعديل</button>
-                    <button class="danger" onclick="deleteBook({{ b.id }})">🗑️ حذف</button>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+          <div class="glass">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+              <div>
+                <h3 style="margin:0;">📖 قائمة الكتب ({{ filtered_count }})</h3>
+                <span style="font-size:0.9em; color:#94a3b8;">عرض الصفحة {{ page }} من {{ total_pages }}</span>
+              </div>
+              <div style="display:flex; gap:10px;">
+                {% if selected_library or selected_city %}
+                <a href="/export_excel?password={{ admin_password }}&mode=library&library={{ selected_library }}&city={{ selected_city }}" style="padding:10px 15px; background:rgba(255,255,255,0.1); border-radius:8px; font-size:0.9em;">📥 تصدير المعروض</a>
+                {% endif %}
+                <button class="danger" onclick="bulkDelete()" style="width:auto; padding:10px 15px;">🗑️ حذف المحدد</button>
+              </div>
+            </div>
+            
+            <div style="overflow-x:auto;">
+              <table id="booksTable">
+                <thead>
+                  <tr>
+                    <th style="width:30px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
+                    <th>ID</th><th>صورة</th><th>اسم الكتاب</th><th>المكتبة</th><th>المدينة</th><th>الناشر</th><th>السعر</th><th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for b in books %}
+                  <tr id="row-{{ b.id }}">
+                    <td><input type="checkbox" class="row-checkbox" value="{{ b.id }}"></td>
+                    <td>{{ b.id }}</td>
+                    <td><img src="{{ b.cover_image or '/static/no-cover.png' }}" style="width:40px; height:50px; object-fit:cover; border-radius:4px;"></td>
+                    <td class="name">{{ b.book_name }}</td>
+                    <td class="lib">{{ b.library }}</td>
+                    <td class="city">{{ b.city }}</td>
+                    <td class="pub">{{ b.publisher }}</td>
+                    <td class="price">{{ b.price }}</td>
+                    <td class="isbn" style="display:none">{{ b.isbn }}</td>
+                    <td class="actions">
+                      <button onclick="editBook({{ b.id }})">✏️</button>
+                      <button class="danger" onclick="deleteBook({{ b.id }})">🗑️</button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- أزرار الصفحات -->
+            {% if total_pages > 1 %}
+            <div class="pagination">
+              {% if page > 1 %}
+              <a href="/admin?password={{ admin_password }}&library={{ selected_library }}&city={{ selected_city }}&page={{ page - 1 }}">السابق</a>
+              {% endif %}
+              
+              {% set start_page = page - 2 if page > 2 else 1 %}
+              {% set end_page = page + 2 if page + 2 < total_pages else total_pages %}
+              
+              {% for p in range(start_page, end_page + 1) %}
+              <a href="/admin?password={{ admin_password }}&library={{ selected_library }}&city={{ selected_city }}&page={{ p }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+              {% endfor %}
+              
+              {% if page < total_pages %}
+              <a href="/admin?password={{ admin_password }}&library={{ selected_library }}&city={{ selected_city }}&page={{ page + 1 }}">التالي</a>
+              {% endif %}
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
 
       <!-- نافذة التعديل -->
-      <div id="editModal" style="display:none; position:fixed; top:10%; left:10%; right:10%; background:#1e293b; padding:20px; border-radius:20px; border:1px solid gold; z-index:1000">
-        <h3>تعديل كتاب</h3>
-        <form id="editForm">
-          <input type="hidden" id="edit_id" name="id">
-          <input id="edit_name" name="book_name" placeholder="اسم الكتاب" required>
-          <input id="edit_city" name="city" placeholder="المدينة">
-          <input id="edit_library" name="library" placeholder="المكتبة">
-          <input id="edit_price" name="price" placeholder="السعر">
-          <input id="edit_publisher" name="publisher" placeholder="دار النشر">
-          <input id="edit_cover" name="cover_image" placeholder="رابط صورة الغلاف">
-          <input id="edit_isbn" name="isbn" placeholder="ISBN">
-          <button type="button" onclick="submitEdit()">حفظ التعديلات</button>
-          <button type="button" class="danger" onclick="document.getElementById('editModal').style.display='none'">إلغاء</button>
-        </form>
+      <div id="editModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
+        <div class="glass" style="width:90%; max-width:500px; position:relative;">
+          <h3 style="margin-bottom:20px;">✏️ تعديل كتاب</h3>
+          <form id="editForm">
+            <input type="hidden" id="edit_id" name="id">
+            <input id="edit_name" name="book_name" placeholder="اسم الكتاب" required>
+            <input id="edit_library" name="library" placeholder="المكتبة">
+            <input id="edit_city" name="city" placeholder="المدينة">
+            <input id="edit_publisher" name="publisher" placeholder="دار النشر">
+            <input id="edit_price" name="price" placeholder="السعر">
+            <input id="edit_isbn" name="isbn" placeholder="ISBN">
+            <input id="edit_cover" name="cover_image" placeholder="رابط صورة الغلاف">
+            <div style="display:flex; gap:10px; margin-top:15px;">
+              <button type="button" class="success" onclick="submitEdit()">حفظ التعديلات</button>
+              <button type="button" class="danger" onclick="document.getElementById('editModal').style.display='none'">إلغاء</button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <script>
         const ADMIN_PASSWORD = "{{ admin_password }}";
-        function showImportOptions() {
-            document.getElementById("importOptions").style.display = "block";
+        
+        // إظهار الرسائل القادمة من الرابط
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('msg')) {
+            const msgBox = document.getElementById('msg-box');
+            msgBox.textContent = decodeURIComponent(urlParams.get('msg'));
+            msgBox.style.display = 'block';
+            setTimeout(() => msgBox.style.display = 'none', 5000);
+            
+            // إزالة msg من الرابط حتى لا تظهر عند التحديث
+            urlParams.delete('msg');
+            window.history.replaceState(null, '', '?' + urlParams.toString());
         }
-        function applyFilters() {
-            let nameFilter = document.getElementById("filterBookName").value.toLowerCase().trim();
-            let libFilter = document.getElementById("filterLibrary").value.toLowerCase().trim();
-            let pubFilter = document.getElementById("filterPublisher").value.toLowerCase().trim();
-            let table = document.getElementById("booksTable");
-            let tr = table.getElementsByTagName("tr");
-            for (let i = 1; i < tr.length; i++) {
-                let cells = tr[i].getElementsByTagName("td");
-                if (cells.length < 8) continue;
-                let name = (cells[1]?.textContent || "").toLowerCase();
-                let lib = (cells[3]?.textContent || "").toLowerCase();
-                let pub = (cells[5]?.textContent || "").toLowerCase();
-                let match = true;
-                if (nameFilter && !name.includes(nameFilter)) match = false;
-                if (libFilter && !lib.includes(libFilter)) match = false;
-                if (pubFilter && !pub.includes(pubFilter)) match = false;
-                tr[i].style.display = match ? "" : "none";
+
+        function toggleAll(source) {
+            let checkboxes = document.querySelectorAll('.row-checkbox');
+            for(let i=0; i<checkboxes.length; i++) {
+                checkboxes[i].checked = source.checked;
             }
         }
+        
+        function bulkDelete() {
+            let checkboxes = document.querySelectorAll('.row-checkbox:checked');
+            let ids = Array.from(checkboxes).map(cb => cb.value);
+            if(ids.length === 0) return alert("الرجاء تحديد كتاب واحد على الأقل.");
+            
+            if (confirm("هل أنت متأكد من حذف " + ids.length + " كتاب نهائياً؟")) {
+                let formData = new FormData();
+                formData.append("action", "bulk_delete");
+                ids.forEach(id => formData.append("ids[]", id));
+                
+                fetch("/admin?password=" + ADMIN_PASSWORD, {
+                    method: "POST", body: formData
+                }).then(res => res.json()).then(data => {
+                    alert(data.msg);
+                    location.reload();
+                }).catch(err => alert("حدث خطأ"));
+            }
+        }
+
         function editBook(id) {
             let row = document.getElementById("row-" + id);
             document.getElementById("edit_id").value = id;
@@ -520,38 +643,43 @@ def admin():
             document.getElementById("edit_publisher").value = row.querySelector(".pub").textContent.trim();
             document.getElementById("edit_isbn").value = row.querySelector(".isbn").textContent.trim();
             document.getElementById("edit_cover").value = row.querySelector("img")?.src || "";
-            document.getElementById("editModal").style.display = "block";
+            document.getElementById("editModal").style.display = "flex";
         }
+
         function submitEdit() {
             let form = document.getElementById("editForm");
             let formData = new FormData(form);
             formData.append("action", "edit");
             fetch("/admin?password=" + ADMIN_PASSWORD, {
-                method: "POST",
-                body: formData
-            }).then(response => response.json()).then(data => {
+                method: "POST", body: formData
+            }).then(res => res.json()).then(data => {
                 alert(data.msg);
                 location.reload();
             }).catch(err => alert("خطأ"));
         }
+
         function deleteBook(id) {
             if (confirm("هل أنت متأكد من حذف هذا الكتاب؟")) {
                 let formData = new FormData();
                 formData.append("id", id);
                 formData.append("action", "delete");
                 fetch("/admin?password=" + ADMIN_PASSWORD, {
-                    method: "POST",
-                    body: formData
-                }).then(response => response.json()).then(data => {
+                    method: "POST", body: formData
+                }).then(res => res.json()).then(data => {
                     alert(data.msg);
-                    document.getElementById("row-" + id).remove();
+                    location.reload();
                 }).catch(err => alert("خطأ"));
             }
         }
       </script>
     </body>
     </html>
-    """, books=books_list, books_count=len(books_list), admin_password=ADMIN_PASSWORD, libraries=libraries, selected_library=selected_library)
+    """, books=books_list, total_books=total_books, total_libraries=total_libraries, 
+    total_cities=total_cities, total_publishers=total_publishers, 
+    libraries=libraries, city_names=city_names,
+    selected_library=selected_library, selected_city=selected_city,
+    page=page, total_pages=total_pages, filtered_count=filtered_count,
+    admin_password=ADMIN_PASSWORD)
 
 @app.route("/")
 def home():
