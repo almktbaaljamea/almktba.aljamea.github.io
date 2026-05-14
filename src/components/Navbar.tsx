@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import './Navbar.css';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar() {
   return (
@@ -17,7 +18,8 @@ export default function Navbar() {
           <Link href="/about" className="nav-link">عن المنصة</Link>
         </div>
         
-        <div className="navbar-actions">
+        <div className="navbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <ThemeToggle />
           <Link href="/for-bookstores" className="btn btn-primary">أضف مكتبتك</Link>
         </div>
       </div>

@@ -10,6 +10,9 @@
   --text-light: #7A7A7A;
   --success-color: #27AE60;
   --error-color: #E74C3C;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-modal: rgba(255, 255, 255, 0.95);
   --font-main: 'Cairo', sans-serif;
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -19,6 +22,22 @@
   --radius-lg: 16px;
   --transition-fast: 0.2s ease;
   --transition-normal: 0.3s ease;
+}
+
+[data-theme="dark"] {
+  --primary-color: #D4AF37; /* Brighter gold for dark mode */
+  --primary-dark: #B5952F;
+  --secondary-color: #F9F6F0; /* Light text for contrast */
+  --background-light: #0f172a; /* Deep slate blue background */
+  --background-card: #1e293b;
+  --text-dark: #f8fafc;
+  --text-light: #94a3b8;
+  --glass-bg: rgba(30, 41, 59, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-modal: rgba(30, 41, 59, 0.95);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -91,10 +110,10 @@ button, input, select {
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }

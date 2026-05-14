@@ -16,6 +16,7 @@ function ExploreContent() {
   const [selectedBook, setSelectedBook] = useState<any>(null);
 
   // Filter States
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]); // Publishers used as Categories for now
 
@@ -77,7 +78,13 @@ function ExploreContent() {
       </div>
 
       <div className="search-content">
-        <aside className="search-sidebar glass-panel animate-fade-in animate-delay-1">
+        <button className="mobile-filter-btn" onClick={() => setIsFilterOpen(true)}>
+          🔍 تصفية النتائج
+        </button>
+        <div className={`sidebar-overlay ${isFilterOpen ? 'open' : ''}`} onClick={() => setIsFilterOpen(false)}></div>
+        
+        <aside className={`search-sidebar glass-panel animate-fade-in animate-delay-1 ${isFilterOpen ? 'open' : ''}`}>
+          <button className="close-sidebar-btn" onClick={() => setIsFilterOpen(false)}>&times;</button>
           <h3 className="filter-title">تصفية النتائج</h3>
           
           <div className="filter-group">
