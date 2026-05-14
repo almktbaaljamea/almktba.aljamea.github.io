@@ -12,7 +12,7 @@ export default function Navbar() {
         
         <div className="navbar-links">
           <Link href="/" className="nav-link">الرئيسية</Link>
-          <Link href="/search" className="nav-link">البحث عن كتاب</Link>
+          <Link href="/explore" className="nav-link">البحث عن كتاب</Link>
           <Link href="/bookstores" className="nav-link">دليل المكتبات</Link>
           <Link href="/about" className="nav-link">عن المنصة</Link>
         </div>

@@ -16,9 +16,9 @@ export default function Home() {
             <SearchBar placeholder="ابحث باسم الكتاب، المؤلف، أو دار النشر..." />
             <div className="hero-tags">
               <span>الكلمات الشائعة:</span>
-              <Link href="/search?q=روايات" className="tag">روايات</Link>
-              <Link href="/search?q=تاريخ" className="tag">تاريخ</Link>
-              <Link href="/search?q=تطوير الذات" className="tag">تطوير الذات</Link>
+              <Link href="/explore?q=روايات" className="tag">روايات</Link>
+              <Link href="/explore?q=تاريخ" className="tag">تاريخ</Link>
+              <Link href="/explore?q=تطوير الذات" className="tag">تطوير الذات</Link>
             </div>
           </div>
           <div className="hero-image animate-fade-in animate-delay-2">

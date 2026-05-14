@@ -16,7 +16,7 @@ export default function Footer() {
           <h4 className="footer-subtitle">روابط سريعة</h4>
           <ul className="footer-links">
             <li><Link href="/">الرئيسية</Link></li>
-            <li><Link href="/search">البحث عن كتاب</Link></li>
+            <li><Link href="/explore">البحث عن كتاب</Link></li>
             <li><Link href="/bookstores">المكتبات المشاركة</Link></li>
             <li><Link href="/for-bookstores">أضف مكتبتك</Link></li>
           </ul>

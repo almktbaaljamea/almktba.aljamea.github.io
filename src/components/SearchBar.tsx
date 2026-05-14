@@ -10,7 +10,7 @@ export default function SearchBar({ placeholder = "ابحث..." }: { placeholder
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      router.push(`/search?q=${encodeURIComponent(query)}`);
+      router.push(`/explore?q=${encodeURIComponent(query)}`);
     }
   };
 

@@ -41,7 +41,7 @@ export default function BookstoresDirectory() {
             </div>
             <div className="store-footer">
               <span className="store-rating">⭐ {store.rating}</span>
-              <Link href={`/search?store=${store.id}`} className="btn btn-secondary btn-sm">تصفح الكتب</Link>
+              <Link href={`/explore?store=${store.id}`} className="btn btn-secondary btn-sm">تصفح الكتب</Link>
             </div>
           </div>
         ))}
