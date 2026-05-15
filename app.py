@@ -62,7 +62,9 @@ def init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS library_settings (
                 library_name TEXT PRIMARY KEY,
-                whatsapp_number TEXT DEFAULT ''
+                whatsapp_number TEXT DEFAULT '',
+                location_link TEXT DEFAULT '',
+                description TEXT DEFAULT ''
             )
         """)
         conn.commit()
@@ -79,14 +81,20 @@ def get_db():
     return conn
 
 # ========== البحث في قاعدة البيانات ==========
-def search(query):
+def search(query, library=""):
     conn = get_db()
-    results = conn.execute(
-        """SELECT b.*, COALESCE(ls.whatsapp_number, '') as whatsapp_number
-           FROM books b LEFT JOIN library_settings ls ON b.library = ls.library_name
-           WHERE b.book_name LIKE ?""",
-        (f'%{query}%',)
-    ).fetchall()
+    sql = """SELECT b.*, COALESCE(ls.whatsapp_number, '') as whatsapp_number
+             FROM books b LEFT JOIN library_settings ls ON b.library = ls.library_name
+             WHERE 1=1"""
+    params = []
+    if query:
+        sql += " AND b.book_name LIKE ?"
+        params.append(f'%{query}%')
+    if library:
+        sql += " AND b.library = ?"
+        params.append(library)
+        
+    results = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(row) for row in results]
 
@@ -486,14 +494,16 @@ def admin():
           </div>
           <div class="glass">
             <h3>📱 واتساب المكتبات</h3>
-            <form id="whatsappForm" onsubmit="saveWhatsapp(event)">
+            <form id="librarySettingsForm" onsubmit="saveLibrarySettings(event)">
               <select id="wa_library" style="margin-bottom:8px;">
                 {% for lib in libraries %}
                 <option value="{{ lib.name }}">{{ lib.name }}</option>
                 {% endfor %}
               </select>
               <input id="wa_number" placeholder="رقم واتساب (مثل 905xxxxxxxxx)" style="margin-bottom:8px;">
-              <button type="submit" class="success" style="font-size:0.85em;">💾 حفظ</button>
+              <input id="loc_link" placeholder="رابط خرائط جوجل" style="margin-bottom:8px;">
+              <textarea id="lib_desc" placeholder="وصف المكتبة / مبيعاتها" style="width:100%; height:60px; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(15,23,42,0.8); color:white; outline:none; margin-bottom:8px; resize:none;"></textarea>
+              <button type="submit" class="success" style="font-size:0.85em;">💾 حفظ الإعدادات</button>
             </form>
             <div id="wa-msg" style="font-size:0.8em; color:var(--success); margin-top:5px;"></div>
           </div>
@@ -708,12 +718,14 @@ def admin():
             }
         }
 
-        function saveWhatsapp(e) {
+        function saveLibrarySettings(e) {
             e.preventDefault();
             let formData = new FormData();
             formData.append("password", ADMIN_PASSWORD);
             formData.append("library_name", document.getElementById("wa_library").value);
             formData.append("whatsapp_number", document.getElementById("wa_number").value);
+            formData.append("location_link", document.getElementById("loc_link").value);
+            formData.append("description", document.getElementById("lib_desc").value);
             fetch("/save_library_settings", {
                 method: "POST", body: formData
             }).then(res => res.json()).then(data => {
@@ -748,7 +760,8 @@ def serve_nextjs(path):
 @app.route("/search")
 def api():
     q = request.args.get("q", "")
-    return jsonify(search(q))
+    library = request.args.get("library", "")
+    return jsonify(search(q, library))
 
 @app.route("/filters_data")
 def filters_data():
@@ -783,7 +796,9 @@ def bookstores_data():
     conn = get_db()
     rows = conn.execute("""
         SELECT b.library, b.city, COUNT(*) as books_count,
-               COALESCE(ls.whatsapp_number, '') as whatsapp_number
+               COALESCE(ls.whatsapp_number, '') as whatsapp_number,
+               COALESCE(ls.location_link, '') as location_link,
+               COALESCE(ls.description, '') as description
         FROM books b
         LEFT JOIN library_settings ls ON b.library = ls.library_name
         WHERE b.library != ''
@@ -807,6 +822,8 @@ def bookstores_data():
             'city': row[1],
             'books_count': row[2],
             'whatsapp_number': row[3],
+            'location_link': row[4],
+            'description': row[5],
             'logo': logo_url
         })
     return jsonify(result)
@@ -817,16 +834,18 @@ def save_library_settings():
         return jsonify({"status": "error", "msg": "غير مصرح"}), 403
     library_name = request.form.get("library_name", "").strip()
     whatsapp_number = request.form.get("whatsapp_number", "").strip()
+    location_link = request.form.get("location_link", "").strip()
+    description = request.form.get("description", "").strip()
     if not library_name:
         return jsonify({"status": "error", "msg": "اسم المكتبة مطلوب"}), 400
     conn = get_db()
     conn.execute(
-        "INSERT OR REPLACE INTO library_settings (library_name, whatsapp_number) VALUES (?, ?)",
-        (library_name, whatsapp_number)
+        "INSERT OR REPLACE INTO library_settings (library_name, whatsapp_number, location_link, description) VALUES (?, ?, ?, ?)",
+        (library_name, whatsapp_number, location_link, description)
     )
     conn.commit()
     conn.close()
-    return jsonify({"status": "ok", "msg": f"تم حفظ رقم واتساب {library_name}"})
+    return jsonify({"status": "ok", "msg": f"تم حفظ إعدادات {library_name}"})
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)

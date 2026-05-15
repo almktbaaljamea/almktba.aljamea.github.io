@@ -9,6 +9,7 @@ import './search.css';
 function ExploreContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
+  const libraryParam = searchParams.get('library') || '';
 
   const [books, setBooks] = useState<any[]>([]);
   const [filtersData, setFiltersData] = useState<any>({ cities: [], libraries: [], publishers: [], min_price: 0, max_price: 0 });
@@ -19,6 +20,7 @@ function ExploreContent() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedLibraries, setSelectedLibraries] = useState<string[]>(libraryParam ? [libraryParam] : []);
   const [currentPage, setCurrentPage] = useState(1);
   const BOOKS_PER_PAGE = 20;
 
@@ -26,8 +28,13 @@ function ExploreContent() {
     fetch('/filters_data').then(res => res.json()).then(data => setFiltersData(data)).catch(console.error);
 
     setLoading(true);
-    const endpoint = query.length >= 2 ? `/search?q=${encodeURIComponent(query)}` : `/initial_books`;
+    let endpoint = query.length >= 2 ? `/search?q=${encodeURIComponent(query)}` : `/initial_books`;
     
+    // If libraryParam is present and no query, we might want all books for that library
+    if (libraryParam && query.length < 2) {
+      endpoint = `/search?library=${encodeURIComponent(libraryParam)}`;
+    }
+
     fetch(endpoint)
       .then(res => res.json())
       .then(data => {
@@ -57,6 +64,7 @@ function ExploreContent() {
   const filteredBooks = books.filter(b => {
     if (selectedCities.length > 0 && !selectedCities.includes(b.city)) return false;
     if (selectedCategories.length > 0 && !selectedCategories.includes(b.publisher)) return false;
+    if (selectedLibraries.length > 0 && !selectedLibraries.includes(b.library)) return false;
     return true;
   });
 
@@ -112,9 +120,12 @@ function ExploreContent() {
       )}
 
       <div className="search-header animate-fade-in">
-        <h1 className="title-main">نتائج البحث</h1>
+        <h1 className="title-main">{libraryParam ? `كتب مكتبة: ${libraryParam}` : 'نتائج البحث'}</h1>
         <p className="subtitle">
-          {query ? `نتائج البحث عن: "${query}"` : 'تصفح جميع الكتب المتوفرة في المكتبات العربية'}
+          {libraryParam 
+            ? `تصفح جميع الكتب المتوفرة في ${libraryParam}`
+            : (query ? `نتائج البحث عن: "${query}"` : 'تصفح جميع الكتب المتوفرة في المكتبات العربية')
+          }
         </p>
         <div className="search-bar-wrapper">
           <SearchBar placeholder="ابحث عن كتاب آخر..." />
