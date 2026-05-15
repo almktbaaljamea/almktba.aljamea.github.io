@@ -773,7 +773,7 @@ def initial_books():
     books = conn.execute(
         """SELECT b.*, COALESCE(ls.whatsapp_number, '') as whatsapp_number
            FROM books b LEFT JOIN library_settings ls ON b.library = ls.library_name
-           ORDER BY RANDOM() LIMIT 24"""
+           ORDER BY b.id DESC LIMIT 1000"""
     ).fetchall()
     conn.close()
     return jsonify([dict(row) for row in books])

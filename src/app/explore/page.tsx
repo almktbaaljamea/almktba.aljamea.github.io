@@ -15,10 +15,12 @@ function ExploreContent() {
   const [loading, setLoading] = useState(true);
   const [selectedBook, setSelectedBook] = useState<any>(null);
 
-  // Filter States
+  // Filter & Pagination States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const BOOKS_PER_PAGE = 20;
 
   useEffect(() => {
     fetch('/filters_data').then(res => res.json()).then(data => setFiltersData(data)).catch(console.error);
@@ -31,12 +33,18 @@ function ExploreContent() {
       .then(data => {
         setBooks(data);
         setLoading(false);
+        setCurrentPage(1); // Reset page on new search
       })
       .catch(err => {
         console.error(err);
         setLoading(false);
       });
   }, [query]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCities, selectedCategories]);
 
   const handleCityToggle = (city: string) => {
     setSelectedCities(prev => prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]);
@@ -51,6 +59,9 @@ function ExploreContent() {
     if (selectedCategories.length > 0 && !selectedCategories.includes(b.publisher)) return false;
     return true;
   });
+
+  const totalPages = Math.ceil(filteredBooks.length / BOOKS_PER_PAGE);
+  const paginatedBooks = filteredBooks.slice((currentPage - 1) * BOOKS_PER_PAGE, currentPage * BOOKS_PER_PAGE);
 
   const [isGoodreadsLoading, setIsGoodreadsLoading] = useState(false);
   const [loaderMessage, setLoaderMessage] = useState("");
@@ -142,12 +153,54 @@ function ExploreContent() {
         <div className="search-results">
           <p style={{marginBottom: '20px', color: '#94a3b8'}}>تم العثور على <strong>{filteredBooks.length}</strong> كتاب</p>
           <div className="books-grid">
-            {filteredBooks.map((book, index) => (
+            {paginatedBooks.map((book, index) => (
               <div key={book.id} className={`animate-fade-in animate-delay-${(index % 3) + 1}`}>
                 <BookCard {...book} onOpenModal={() => setSelectedBook(book)} />
               </div>
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <div className="pagination-container animate-fade-in">
+              <button 
+                className="pagination-btn" 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                السابق
+              </button>
+              
+              <div className="pagination-numbers">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  // Show pages around current page
+                  let pageNum = currentPage;
+                  if (currentPage <= 3) pageNum = i + 1;
+                  else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                  else pageNum = currentPage - 2 + i;
+                  
+                  if (pageNum < 1 || pageNum > totalPages) return null;
+
+                  return (
+                    <button
+                      key={pageNum}
+                      className={`pagination-number ${currentPage === pageNum ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button 
+                className="pagination-btn" 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                التالي
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
