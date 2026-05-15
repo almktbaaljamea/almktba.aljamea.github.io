@@ -56,6 +56,20 @@ def init_db():
         except Exception as e:
             print("❌ خطأ أثناء تحويل الإكسيل:", e)
 
+    # إنشاء جدول إعدادات المكتبات (أرقام واتساب)
+    try:
+        conn = sqlite3.connect(DATABASE)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS library_settings (
+                library_name TEXT PRIMARY KEY,
+                whatsapp_number TEXT DEFAULT ''
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("❌ خطأ أثناء إنشاء جدول إعدادات المكتبات:", e)
+
 # تشغيل التهيئة
 init_db()
 
@@ -68,82 +82,15 @@ def get_db():
 def search(query):
     conn = get_db()
     results = conn.execute(
-        "SELECT * FROM books WHERE book_name LIKE ?",
+        """SELECT b.*, COALESCE(ls.whatsapp_number, '') as whatsapp_number
+           FROM books b LEFT JOIN library_settings ls ON b.library = ls.library_name
+           WHERE b.book_name LIKE ?""",
         (f'%{query}%',)
     ).fetchall()
     conn.close()
     return [dict(row) for row in results]
 
-# ========== نقطة النهاية الذكية لـ Goodreads ==========
-@app.route("/get_goodreads_link")
-def get_goodreads_link():
-    book_name = request.args.get("q", "").strip()
-    if not book_name:
-        return jsonify({"error": "No query"}), 400
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-    }
-    search_url = f"https://www.goodreads.com/search?q={requests.utils.quote(book_name)}"
-
-    try:
-        resp = requests.get(search_url, headers=headers, timeout=10)
-        if resp.status_code != 200:
-            return jsonify({"url": None, "message": "فشل الاتصال بـ Goodreads"})
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        table = soup.find("table", class_="tableList")
-        if not table:
-            return jsonify({"url": None, "message": "لم يتم العثور على نتائج"})
-
-        rows = table.find_all("tr")
-        best_match = None
-        best_score = -1
-
-        for row in rows:
-            link_tag = row.find("a", class_="bookTitle")
-            if not link_tag:
-                continue
-
-            title = link_tag.get_text(strip=True)
-            href = link_tag.get("href", "")
-            if not href.startswith("http"):
-                href = "https://www.goodreads.com" + href
-
-            # استخراج التقييم وعدد المقيمين
-            rating_span = None
-            for span in row.find_all("span"):
-                if "minirating" in span.get("class", []):
-                    rating_span = span
-                    break
-
-            rating = 0.0
-            ratings_count = 0
-            if rating_span:
-                text = rating_span.get_text()
-                rating_match = re.search(r'(\d+\.?\d*)\s*avg', text)
-                count_match = re.search(r'(\d[\d,]*)\s*ratings', text)
-                if rating_match:
-                    rating = float(rating_match.group(1))
-                if count_match:
-                    ratings_count = int(count_match.group(1).replace(',', ''))
-
-            # حساب درجة المطابقة: تشابه النص + التقييم + عدد المقيمين
-            similarity = SequenceMatcher(None, book_name.lower(), title.lower()).ratio()
-            score = similarity * 10 + (ratings_count / 1000) + (rating / 10)
-
-            if score > best_score:
-                best_score = score
-                best_match = href
-
-        if best_match:
-            return jsonify({"url": best_match})
-        else:
-            return jsonify({"url": None, "message": "لم يتم العثور على تطابق مناسب"})
-
-    except Exception as e:
-        print(f"Error fetching Goodreads link: {e}")
-        return jsonify({"url": None, "message": "حدث خطأ"})
+# ========== نقاط النهاية الجديدة ==========
 
 # ========== النسخ الاحتياطي ==========
 @app.route("/backup")
@@ -461,6 +408,19 @@ def admin():
               {% endfor %}
             </div>
           </div>
+          <div class="glass">
+            <h3>📱 واتساب المكتبات</h3>
+            <form id="whatsappForm" onsubmit="saveWhatsapp(event)">
+              <select id="wa_library" style="margin-bottom:8px;">
+                {% for lib in libraries %}
+                <option value="{{ lib.name }}">{{ lib.name }}</option>
+                {% endfor %}
+              </select>
+              <input id="wa_number" placeholder="رقم واتساب (مثل 905xxxxxxxxx)" style="margin-bottom:8px;">
+              <button type="submit" class="success" style="font-size:0.85em;">💾 حفظ</button>
+            </form>
+            <div id="wa-msg" style="font-size:0.8em; color:var(--success); margin-top:5px;"></div>
+          </div>
         </div>
 
         <div class="content">
@@ -476,8 +436,8 @@ def admin():
                   <input name="city" placeholder="المدينة">
                   <input name="publisher" placeholder="دار النشر">
                   <input name="price" placeholder="السعر">
-                  <input name="isbn" placeholder="ISBN">
-                  <input name="cover_image" placeholder="رابط الغلاف">
+                  <input type="hidden" name="isbn" value="">
+                  <input name="cover_image" placeholder="رابط الغلاف" style="grid-column:span 2">
                 </div>
                 <button type="submit">إضافة الكتاب</button>
               </form>
@@ -498,7 +458,7 @@ def admin():
                 </div>
                 <button type="submit" class="success">استيراد الملف</button>
               </form>
-              <p style="font-size:0.8em; color:#94a3b8; margin-top:10px;">الأعمدة المطلوبة: book_name, city, library, price, publisher, cover_image, isbn</p>
+              <p style="font-size:0.8em; color:#94a3b8; margin-top:10px;">الأعمدة المطلوبة: book_name, city, library, price, publisher, cover_image</p>
             </div>
           </div>
 
@@ -581,7 +541,7 @@ def admin():
             <input id="edit_city" name="city" placeholder="المدينة">
             <input id="edit_publisher" name="publisher" placeholder="دار النشر">
             <input id="edit_price" name="price" placeholder="السعر">
-            <input id="edit_isbn" name="isbn" placeholder="ISBN">
+            <input type="hidden" id="edit_isbn" name="isbn" value="">
             <input id="edit_cover" name="cover_image" placeholder="رابط صورة الغلاف">
             <div style="display:flex; gap:10px; margin-top:15px;">
               <button type="button" class="success" onclick="submitEdit()">حفظ التعديلات</button>
@@ -671,6 +631,20 @@ def admin():
                 }).catch(err => alert("خطأ"));
             }
         }
+
+        function saveWhatsapp(e) {
+            e.preventDefault();
+            let formData = new FormData();
+            formData.append("password", ADMIN_PASSWORD);
+            formData.append("library_name", document.getElementById("wa_library").value);
+            formData.append("whatsapp_number", document.getElementById("wa_number").value);
+            fetch("/save_library_settings", {
+                method: "POST", body: formData
+            }).then(res => res.json()).then(data => {
+                document.getElementById("wa-msg").textContent = data.msg;
+                setTimeout(() => document.getElementById("wa-msg").textContent = '', 3000);
+            }).catch(err => alert("خطأ"));
+        }
       </script>
     </body>
     </html>
@@ -720,9 +694,63 @@ def filters_data():
 @app.route("/initial_books")
 def initial_books():
     conn = get_db()
-    books = conn.execute("SELECT * FROM books ORDER BY RANDOM() LIMIT 24").fetchall()
+    books = conn.execute(
+        """SELECT b.*, COALESCE(ls.whatsapp_number, '') as whatsapp_number
+           FROM books b LEFT JOIN library_settings ls ON b.library = ls.library_name
+           ORDER BY RANDOM() LIMIT 24"""
+    ).fetchall()
     conn.close()
     return jsonify([dict(row) for row in books])
+
+@app.route("/bookstores_data")
+def bookstores_data():
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT b.library, b.city, COUNT(*) as books_count,
+               COALESCE(ls.whatsapp_number, '') as whatsapp_number
+        FROM books b
+        LEFT JOIN library_settings ls ON b.library = ls.library_name
+        WHERE b.library != ''
+        GROUP BY b.library
+        ORDER BY books_count DESC
+    """).fetchall()
+    conn.close()
+    result = []
+    for row in rows:
+        lib_name = row[0]
+        safe_name = lib_name.replace(' ', '_')
+        logo_url = None
+        for ext in ['png', 'jpg', 'jpeg']:
+            logo_path = f'logos/{safe_name}.{ext}'
+            full_path = os.path.join(app.static_folder, logo_path)
+            if os.path.exists(full_path):
+                logo_url = '/' + urllib.parse.quote(logo_path)
+                break
+        result.append({
+            'name': lib_name,
+            'city': row[1],
+            'books_count': row[2],
+            'whatsapp_number': row[3],
+            'logo': logo_url
+        })
+    return jsonify(result)
+
+@app.route("/save_library_settings", methods=["POST"])
+def save_library_settings():
+    if request.form.get("password") != ADMIN_PASSWORD:
+        return jsonify({"status": "error", "msg": "غير مصرح"}), 403
+    library_name = request.form.get("library_name", "").strip()
+    whatsapp_number = request.form.get("whatsapp_number", "").strip()
+    if not library_name:
+        return jsonify({"status": "error", "msg": "اسم المكتبة مطلوب"}), 400
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO library_settings (library_name, whatsapp_number) VALUES (?, ?)",
+        (library_name, whatsapp_number)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "msg": f"تم حفظ رقم واتساب {library_name}"})
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)

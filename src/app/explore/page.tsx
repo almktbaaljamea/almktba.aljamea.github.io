@@ -18,13 +18,11 @@ function ExploreContent() {
   // Filter States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]); // Publishers used as Categories for now
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    // Fetch filter data
     fetch('/filters_data').then(res => res.json()).then(data => setFiltersData(data)).catch(console.error);
 
-    // Fetch books
     setLoading(true);
     const endpoint = query.length >= 2 ? `/search?q=${encodeURIComponent(query)}` : `/initial_books`;
     
@@ -48,7 +46,6 @@ function ExploreContent() {
     setSelectedCategories(prev => prev.includes(pub) ? prev.filter(c => c !== pub) : [...prev, pub]);
   };
 
-  // Apply Client-Side filters
   const filteredBooks = books.filter(b => {
     if (selectedCities.length > 0 && !selectedCities.includes(b.city)) return false;
     if (selectedCategories.length > 0 && !selectedCategories.includes(b.publisher)) return false;
@@ -56,8 +53,18 @@ function ExploreContent() {
   });
 
   const handleOpenGoodreads = (bookName: string) => {
-    const searchUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`;
+    const searchUrl = `https://duckduckgo.com/?q=!ducky+site:goodreads.com/book/show+${encodeURIComponent(bookName)}`;
     window.open(searchUrl, '_blank');
+  };
+
+  const handleWhatsApp = (book: any) => {
+    if (!book.whatsapp_number) {
+      alert('رقم واتساب هذه المكتبة غير متوفر حالياً');
+      return;
+    }
+    const message = `السلام عليكم، أنا أتيت من منصة المكتبة الجامعة وأرغب في شراء كتاب: ${book.book_name}`;
+    const url = `https://wa.me/${book.whatsapp_number}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -141,12 +148,6 @@ function ExploreContent() {
                   <span className="detail-label">📍 المدينة</span>
                   <span className="detail-value">{selectedBook.city || 'غير محددة'}</span>
                 </div>
-                {selectedBook.isbn && selectedBook.isbn !== 'nan' && selectedBook.isbn !== '' && (
-                  <div className="detail-item" style={{gridColumn: '1 / -1'}}>
-                    <span className="detail-label">🔢 الترقيم الدولي (ISBN)</span>
-                    <span className="detail-value" style={{ direction: 'ltr', textAlign: 'right' }}>{selectedBook.isbn}</span>
-                  </div>
-                )}
               </div>
               
               <div className="book-modal-price">
@@ -154,15 +155,12 @@ function ExploreContent() {
               </div>
               
               <div className="book-modal-actions">
-                <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)}>
-                  📊 بحث في Goodreads
+                <button className="action-btn btn-whatsapp" onClick={() => handleWhatsApp(selectedBook)}>
+                  💬 تواصل مع المكتبة
                 </button>
-                <a className="action-btn btn-google" href={`https://www.google.com/search?q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" rel="noopener noreferrer">
-                  🔍 ابحث في Google
-                </a>
-                <a className="action-btn btn-google" href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" rel="noopener noreferrer" style={{background: '#10b981'}}>
-                  🖼️ صور الكتاب في Google
-                </a>
+                <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)}>
+                  📊 تقييمات Goodreads
+                </button>
               </div>
             </div>
           </div>
@@ -179,3 +177,4 @@ export default function SearchPage() {
     </Suspense>
   );
 }
+
