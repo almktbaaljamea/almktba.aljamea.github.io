@@ -58,19 +58,20 @@ function ExploreContent() {
   const handleOpenGoodreads = async (bookName: string) => {
     setIsGoodreadsLoading(true);
     setLoaderMessage("جاري البحث عن التقييمات...");
+    const directUrl = `https://www.goodreads.com/book/title?title=${encodeURIComponent(bookName)}`;
     try {
       const res = await fetch(`/get_goodreads_link?q=${encodeURIComponent(bookName)}`);
       const data = await res.json();
       if (data.url) {
         window.open(data.url, '_blank');
       } else {
-        // خطة بديلة: فتح صفحة البحث العامة
-        window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
+        // خطة بديلة: رابط التحويل المباشر لصفحة الكتاب
+        window.open(directUrl, '_blank');
       }
     } catch (e) {
       console.error(e);
-      // في حال تعذر الاتصال بالخادم، نفتح صفحة البحث العامة
-      window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
+      // في حال تعذر الاتصال بالخادم، نفتح رابط التحويل المباشر
+      window.open(directUrl, '_blank');
     } finally {
       setIsGoodreadsLoading(false);
       setLoaderMessage("");

@@ -100,28 +100,33 @@ def get_goodreads_link():
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
+        "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
     }
-    search_url = f"https://www.goodreads.com/search?q={requests.utils.quote(book_name)}"
 
+    # المحاولة الأولى: رابط البحث المباشر بالعنوان (غالباً يحول لصفحة الكتاب فوراً)
+    title_url = f"https://www.goodreads.com/book/title?title={requests.utils.quote(book_name)}"
+    
     try:
         session = requests.Session()
-        resp = session.get(search_url, headers=headers, timeout=15, allow_redirects=True)
+        # محاولة الوصول المباشر
+        resp = session.get(title_url, headers=headers, timeout=10, allow_redirects=True)
+        
+        # إذا تحول الرابط لصفحة كتاب محددة
+        if "/book/show/" in resp.url:
+            return jsonify({"url": resp.url})
+
+        # المحاولة الثانية: البحث والفلترة (إذا لم ينجح التحويل المباشر)
+        search_url = f"https://www.goodreads.com/search?q={requests.utils.quote(book_name)}"
+        resp = session.get(search_url, headers=headers, timeout=10)
+        
         if resp.status_code != 200:
-            return jsonify({"url": None, "message": "فشل الاتصال بـ Goodreads"})
+            # إذا فشل الاتصال، نعيد رابط التحويل المباشر لفتحه من المتصفح (client-side)
+            return jsonify({"url": title_url})
 
         soup = BeautifulSoup(resp.text, "html.parser")
         table = soup.find("table", class_="tableList")
         if not table:
-            return jsonify({"url": None, "message": "لم يتم العثور على نتائج"})
+            return jsonify({"url": title_url})
 
         rows = table.find_all("tr")
         best_match = None
@@ -129,33 +134,24 @@ def get_goodreads_link():
 
         for row in rows:
             link_tag = row.find("a", class_="bookTitle")
-            if not link_tag:
-                continue
+            if not link_tag: continue
 
             title = link_tag.get_text(strip=True)
             href = link_tag.get("href", "")
             if not href.startswith("http"):
                 href = "https://www.goodreads.com" + href
 
-            # استخراج التقييم وعدد المقيمين
-            rating_span = None
-            for span in row.find_all("span"):
-                if "minirating" in span.get("class", []):
-                    rating_span = span
-                    break
-
+            # استخراج التقييمات
             rating = 0.0
             ratings_count = 0
+            rating_span = row.find("span", class_="minirating")
             if rating_span:
                 text = rating_span.get_text()
-                rating_match = re.search(r'(\d+\.?\d*)\s*avg', text)
-                count_match = re.search(r'(\d[\d,]*)\s*ratings', text)
-                if rating_match:
-                    rating = float(rating_match.group(1))
-                if count_match:
-                    ratings_count = int(count_match.group(1).replace(',', ''))
+                r_match = re.search(r'(\d+\.?\d*)\s*avg', text)
+                c_match = re.search(r'(\d[\d,]*)\s*ratings', text)
+                if r_match: rating = float(r_match.group(1))
+                if c_match: ratings_count = int(c_match.group(1).replace(',', ''))
 
-            # حساب درجة المطابقة: تشابه النص + التقييم + عدد المقيمين
             similarity = SequenceMatcher(None, book_name.lower(), title.lower()).ratio()
             score = similarity * 10 + (ratings_count / 1000) + (rating / 10)
 
@@ -163,14 +159,12 @@ def get_goodreads_link():
                 best_score = score
                 best_match = href
 
-        if best_match:
-            return jsonify({"url": best_match})
-        else:
-            return jsonify({"url": None, "message": "لم يتم العثور على تطابق مناسب"})
+        return jsonify({"url": best_match if best_match else title_url})
 
     except Exception as e:
-        print(f"Error fetching Goodreads link: {e}")
-        return jsonify({"url": None, "message": "حدث خطأ"})
+        print(f"Goodreads Redirect Error: {e}")
+        return jsonify({"url": title_url})
+
 
 
 
