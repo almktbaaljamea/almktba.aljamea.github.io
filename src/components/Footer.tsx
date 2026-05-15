@@ -28,8 +28,8 @@ export default function Footer() {
           <h4 className="footer-subtitle">تواصل معنا</h4>
           <ul className="footer-links">
             <li><a href="https://wa.me/905366768390" target="_blank" rel="noreferrer">واتساب: 905366768390+</a></li>
-            <li><a href="https://t.me/your_telegram_channel" target="_blank" rel="noreferrer">قناتنا على تيليجرام 📢</a></li>
-            <li><a href="https://t.me/your_book_search_bot" target="_blank" rel="noreferrer">بوت البحث عن الكتب 🤖</a></li>
+            <li><a href="https://web.telegram.org/k/#@almaktaba_aljamea" target="_blank" rel="noreferrer">قناتنا على تيليجرام 📢</a></li>
+            <li><a href="https://web.telegram.org/k/#@almaktaba_aljameabot" target="_blank" rel="noreferrer">بوت البحث عن الكتب 🤖</a></li>
             <li><a href="#" onClick={(e) => { e.preventDefault(); alert('عذراً، لم نقم بفتح حساب انستغرام للمنصة بعد. ترقبونا قريباً!'); }}>انستغرام</a></li>
             <li><a href="#" onClick={(e) => { e.preventDefault(); alert('عذراً، لم نقم بفتح حساب فيسبوك للمنصة بعد. ترقبونا قريباً!'); }}>فيسبوك</a></li>
           </ul>
