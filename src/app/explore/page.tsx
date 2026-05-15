@@ -157,8 +157,11 @@ function ExploreContent() {
                 <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)}>
                   📊 بحث في Goodreads
                 </button>
-                <a className="action-btn btn-google" href={`https://www.google.com/search?tbm=bks&q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" rel="noopener noreferrer">
-                  📖 ابحث في Google Books
+                <a className="action-btn btn-google" href={`https://www.google.com/search?q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" rel="noopener noreferrer">
+                  🔍 ابحث في Google
+                </a>
+                <a className="action-btn btn-google" href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" rel="noopener noreferrer" style={{background: '#10b981'}}>
+                  🖼️ صور الكتاب في Google
                 </a>
               </div>
             </div>

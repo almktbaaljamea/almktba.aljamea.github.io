@@ -1,62 +1,12 @@
-"use client";
 import Link from 'next/link';
 import './BookCard.css';
-import { useState, useEffect } from 'react';
 
-const imageCache: Record<string, string> = {};
-
-export default function BookCard(props: any) {
-  const { id, book_name, publisher, price, cover_image, library, city, isbn, onOpenModal } = props;
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    if (book_name) {
-      if (imageCache[book_name]) {
-        setImageSrc(imageCache[book_name]);
-        return;
-      }
-      
-      const fetchImage = async () => {
-        try {
-          const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(book_name)}&maxResults=1`);
-          const data = await res.json();
-          if (data.items && data.items.length > 0) {
-            const img = data.items[0].volumeInfo?.imageLinks?.thumbnail;
-            if (img && isMounted) {
-               const secureImg = img.replace('http:', 'https:');
-               imageCache[book_name] = secureImg;
-               setImageSrc(secureImg);
-            }
-          }
-        } catch (e) {
-          console.error("Error fetching book cover", e);
-        }
-      };
-      
-      const timer = setTimeout(fetchImage, 200 + Math.random() * 500); // jitter to avoid rate limits
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-      };
-    }
-  }, [book_name]);
-
-  const displayImage = imageSrc || cover_image;
-
-  const handleOpenModal = () => {
-    if (onOpenModal) {
-      // Pass the updated book object so the modal gets the accurate image
-      onOpenModal({ ...props, cover_image: displayImage });
-    }
-  };
-
+export default function BookCard({ id, book_name, publisher, price, cover_image, library, city, onOpenModal }: any) {
   return (
-    <div className="book-card glass-panel" onClick={handleOpenModal}>
+    <div className="book-card glass-panel" onClick={() => onOpenModal && onOpenModal(id)}>
       <div className="book-cover">
-        {displayImage ? (
-          <img src={displayImage} alt={book_name} loading="lazy" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+        {cover_image ? (
+          <img src={cover_image} alt={book_name} loading="lazy" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
         ) : (
           <span className="book-icon">📖</span>
         )}
