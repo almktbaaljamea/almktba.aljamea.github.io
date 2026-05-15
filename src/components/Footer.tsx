@@ -13,7 +13,7 @@ export default function Footer() {
             المكتبة التي جَمَعَت كل المكتبات وكل الكتب في مجمع واحد. وجهتك الأولى للعثور على أي كتاب من أي مكتبة.
           </p>
         </div>
-        
+
         <div className="footer-section">
           <h4 className="footer-subtitle">روابط سريعة</h4>
           <ul className="footer-links">
@@ -23,13 +23,14 @@ export default function Footer() {
             <li><a href="https://wa.me/905366768390?text=أرغب+في+تسجيل+مكتبتي+في+منصة+المكتبة+الجامعة" target="_blank" rel="noreferrer">أضف مكتبتك (واتساب)</a></li>
           </ul>
         </div>
-        
+
         <div className="footer-section">
           <h4 className="footer-subtitle">تواصل معنا</h4>
           <ul className="footer-links">
             <li><a href="https://wa.me/905366768390" target="_blank" rel="noreferrer">واتساب: 905366768390+</a></li>
-            <li><a href="https://web.telegram.org/k/#@almaktaba_aljamea" target="_blank" rel="noreferrer">قناتنا على تيليجرام 📢</a></li>
-            <li><a href="https://web.telegram.org/k/#@almaktaba_aljameabot" target="_blank" rel="noreferrer">بوت البحث عن الكتب 🤖</a></li>
+            <li><a href="https://t.me/almaktaba_aljamea" target="_blank" rel="noreferrer">قناتنا على تيليجرام 📢</a></li>
+            <li><a href="https://t.me/almaktaba_aljameabot" target="_blank" rel="noreferrer">بوت البحث عن الكتب 🤖</a></li>
+
             <li><a href="#" onClick={(e) => { e.preventDefault(); alert('عذراً، لم نقم بفتح حساب انستغرام للمنصة بعد. ترقبونا قريباً!'); }}>انستغرام</a></li>
             <li><a href="#" onClick={(e) => { e.preventDefault(); alert('عذراً، لم نقم بفتح حساب فيسبوك للمنصة بعد. ترقبونا قريباً!'); }}>فيسبوك</a></li>
           </ul>
