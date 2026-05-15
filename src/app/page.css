@@ -165,97 +165,64 @@
   padding: 6rem 0;
 }
 
-.cta-grid {
+.full-width-cta {
+  padding: 4rem;
+  text-align: center;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.cta-intro {
+  font-size: 1.2rem;
+  margin-bottom: 3rem !important;
+  color: var(--text-dark) !important;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cta-benefits-detailed {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
-}
-
-.cta-card {
-  padding: 3.5rem;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.cta-card h2 {
-  font-size: 2rem;
-  margin-bottom: 1.5rem;
-  color: var(--secondary-color);
-}
-
-.cta-card p {
-  font-size: 1.1rem;
-  margin-bottom: 2rem;
-  color: var(--text-light);
-  line-height: 1.7;
-}
-
-.cta-benefits {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: auto;
+  gap: 1.5rem;
+  text-align: right;
+  margin-bottom: 3rem;
 }
 
 .benefit-item {
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--secondary-color);
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  transition: transform 0.2s;
 }
 
-.contact-methods {
+.benefit-item:hover {
+  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cta-action-wrapper {
   display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  justify-content: center;
   margin-top: 1rem;
 }
 
-.contact-item {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-.contact-item .icon {
-  font-size: 1.75rem;
-  width: 50px;
-  height: 50px;
-  background: var(--background-light);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.contact-item div {
-  display: flex;
-  flex-direction: column;
-}
-
-.contact-item strong {
-  font-size: 0.9rem;
-  color: var(--text-light);
-}
-
-.contact-link {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--primary-color);
-  transition: color 0.2s;
-}
-
-.contact-link:hover {
-  color: var(--primary-dark);
-}
-
-@media (max-width: 850px) {
-  .cta-grid {
+@media (max-width: 768px) {
+  .cta-benefits-detailed {
     grid-template-columns: 1fr;
   }
-  .cta-card {
+  .full-width-cta {
     padding: 2.5rem 1.5rem;
   }
+  .cta-intro {
+    font-size: 1.1rem;
+  }
 }
+
 
 .btn-lg {
   padding: 16px 40px;
