@@ -55,24 +55,9 @@ function ExploreContent() {
     return true;
   });
 
-  const [isGoodreadsLoading, setIsGoodreadsLoading] = useState(false);
-
-  const handleOpenGoodreads = async (bookName: string) => {
-    setIsGoodreadsLoading(true);
-    try {
-      const res = await fetch(`/get_goodreads_link?q=${encodeURIComponent(bookName)}`);
-      const data = await res.json();
-      if (data.url) {
-        window.open(data.url, '_blank');
-      } else {
-        alert(data.message || 'لم يتم العثور على رابط Goodreads');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('حدث خطأ أثناء جلب التقييمات');
-    } finally {
-      setIsGoodreadsLoading(false);
-    }
+  const handleOpenGoodreads = (bookName: string) => {
+    const searchUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`;
+    window.open(searchUrl, '_blank');
   };
 
   return (
@@ -169,8 +154,8 @@ function ExploreContent() {
               </div>
               
               <div className="book-modal-actions">
-                <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)} disabled={isGoodreadsLoading}>
-                  {isGoodreadsLoading ? 'جاري البحث...' : '📊 تقييمات Goodreads'}
+                <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)}>
+                  📊 بحث في Goodreads
                 </button>
                 <a className="action-btn btn-google" href={`https://www.google.com/search?tbm=bks&q=${encodeURIComponent(selectedBook.book_name)}`} target="_blank" rel="noopener noreferrer">
                   📖 ابحث في Google Books
