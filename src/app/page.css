@@ -198,17 +198,26 @@
 }
 
 @media (max-width: 992px) {
+  .hero {
+    padding: 3rem 0;
+  }
   .hero-container {
     flex-direction: column;
     text-align: center;
+    gap: 2rem;
   }
   .hero-title {
-    font-size: 2.8rem;
+    font-size: 2.2rem;
   }
   .hero-tags {
     justify-content: center;
   }
-  .search-bar {
-    margin: 0 auto;
+  .floating-book-card {
+    width: 200px;
+    height: 280px;
+  }
+  .book-mockup {
+    font-size: 4rem;
   }
 }
+

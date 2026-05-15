@@ -1,3 +1,5 @@
+"use client";
+
 import Link from 'next/link';
 import './Footer.css';
 
@@ -18,16 +20,18 @@ export default function Footer() {
             <li><Link href="/">الرئيسية</Link></li>
             <li><Link href="/explore">البحث عن كتاب</Link></li>
             <li><Link href="/bookstores">المكتبات المشاركة</Link></li>
-            <li><Link href="/for-bookstores">أضف مكتبتك</Link></li>
+            <li><a href="https://wa.me/905366768390?text=أرغب+في+تسجيل+مكتبتي+في+منصة+المكتبة+الجامعة" target="_blank" rel="noreferrer">أضف مكتبتك (واتساب)</a></li>
           </ul>
         </div>
         
         <div className="footer-section">
           <h4 className="footer-subtitle">تواصل معنا</h4>
           <ul className="footer-links">
-            <li><a href="mailto:info@arabbookstores.tr">info@arabbookstores.tr</a></li>
-            <li><a href="https://instagram.com" target="_blank" rel="noreferrer">انستغرام</a></li>
-            <li><a href="https://facebook.com" target="_blank" rel="noreferrer">فيسبوك</a></li>
+            <li><a href="https://wa.me/905366768390" target="_blank" rel="noreferrer">واتساب: 905366768390+</a></li>
+            <li><a href="https://t.me/your_telegram_channel" target="_blank" rel="noreferrer">قناتنا على تيليجرام 📢</a></li>
+            <li><a href="https://t.me/your_book_search_bot" target="_blank" rel="noreferrer">بوت البحث عن الكتب 🤖</a></li>
+            <li><a href="#" onClick={(e) => { e.preventDefault(); alert('عذراً، لم نقم بفتح حساب انستغرام للمنصة بعد. ترقبونا قريباً!'); }}>انستغرام</a></li>
+            <li><a href="#" onClick={(e) => { e.preventDefault(); alert('عذراً، لم نقم بفتح حساب فيسبوك للمنصة بعد. ترقبونا قريباً!'); }}>فيسبوك</a></li>
           </ul>
         </div>
       </div>

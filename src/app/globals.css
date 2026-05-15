@@ -146,3 +146,20 @@ button, input, select {
 .animate-delay-1 { animation-delay: 0.1s; }
 .animate-delay-2 { animation-delay: 0.2s; }
 .animate-delay-3 { animation-delay: 0.3s; }
+
+/* Responsive Base */
+@media (max-width: 768px) {
+  .title-main {
+    font-size: 2.2rem;
+  }
+  .subtitle {
+    font-size: 1.1rem;
+  }
+  .btn {
+    width: 100%;
+    padding: 14px 20px;
+  }
+  .container {
+    padding: 0 15px;
+  }
+}

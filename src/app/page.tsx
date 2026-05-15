@@ -57,7 +57,7 @@ export default function Home() {
           <div className="cta-content">
             <h2>هل تملك مكتبة عربية في تركيا؟</h2>
             <p>انضم إلينا الآن لتصل إلى آلاف القراء، نظم عرض كتبك، وزد من مبيعاتك.</p>
-            <Link href="/for-bookstores" className="btn btn-primary btn-lg">سجل مكتبتك مجاناً</Link>
+            <a href="https://wa.me/905366768390?text=أرغب+في+تسجيل+مكتبتي+في+منصة+المكتبة+الجامعة" className="btn btn-primary btn-lg">سجل مكتبتك مجاناً</a>
           </div>
         </div>
       </section>
