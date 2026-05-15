@@ -15,7 +15,7 @@ app = Flask(__name__, static_folder='out')
 DATABASE = os.path.join(os.path.dirname(__file__), "books.db")
 
 # كلمة مرور لوحة التحكم (غيّرها كما تريد)
-ADMIN_PASSWORD = "hasanbook2026"
+ADMIN_PASSWORD = "hasanbook2007"
 
 # ========== تحويل تلقائي من Excel إلى SQLite عند أول تشغيل ==========
 def init_db():
