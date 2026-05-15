@@ -162,40 +162,106 @@
 
 /* CTA Section */
 .cta-section {
-  padding: 4rem 20px;
+  padding: 6rem 0;
 }
 
-.cta-container {
-  background: linear-gradient(135deg, var(--secondary-color) 0%, #1A252F 100%);
-  padding: 4rem;
-  border-radius: var(--radius-lg);
-  color: white;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
+.cta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
 }
 
-.cta-content {
-  position: relative;
-  z-index: 1;
+.cta-card {
+  padding: 3.5rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.cta-container h2 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-  color: white;
+.cta-card h2 {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: var(--secondary-color);
 }
 
-.cta-container p {
-  font-size: 1.2rem;
-  margin-bottom: 2.5rem;
-  opacity: 0.9;
+.cta-card p {
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  color: var(--text-light);
+  line-height: 1.7;
+}
+
+.cta-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: auto;
+}
+
+.benefit-item {
+  font-weight: 600;
+  color: var(--secondary-color);
+}
+
+.contact-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.contact-item .icon {
+  font-size: 1.75rem;
+  width: 50px;
+  height: 50px;
+  background: var(--background-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.contact-item div {
+  display: flex;
+  flex-direction: column;
+}
+
+.contact-item strong {
+  font-size: 0.9rem;
+  color: var(--text-light);
+}
+
+.contact-link {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  transition: color 0.2s;
+}
+
+.contact-link:hover {
+  color: var(--primary-dark);
+}
+
+@media (max-width: 850px) {
+  .cta-grid {
+    grid-template-columns: 1fr;
+  }
+  .cta-card {
+    padding: 2.5rem 1.5rem;
+  }
 }
 
 .btn-lg {
   padding: 16px 40px;
   font-size: 1.2rem;
 }
+
 
 @media (max-width: 992px) {
   .hero {
