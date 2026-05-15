@@ -53,24 +53,27 @@ function ExploreContent() {
   });
 
   const [isGoodreadsLoading, setIsGoodreadsLoading] = useState(false);
+  const [loaderMessage, setLoaderMessage] = useState("");
 
   const handleOpenGoodreads = async (bookName: string) => {
     setIsGoodreadsLoading(true);
-    const fallbackUrl = `https://duckduckgo.com/?q=!ducky+site:goodreads.com/book/show+${encodeURIComponent(bookName)}`;
+    setLoaderMessage("جاري البحث عن التقييمات...");
     try {
       const res = await fetch(`/get_goodreads_link?q=${encodeURIComponent(bookName)}`);
       const data = await res.json();
       if (data.url) {
         window.open(data.url, '_blank');
       } else {
-        // fallback: DuckDuckGo redirects directly to the best Goodreads book page
-        window.open(fallbackUrl, '_blank');
+        // خطة بديلة: فتح صفحة البحث العامة
+        window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
       }
     } catch (e) {
       console.error(e);
-      window.open(fallbackUrl, '_blank');
+      // في حال تعذر الاتصال بالخادم، نفتح صفحة البحث العامة
+      window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
     } finally {
       setIsGoodreadsLoading(false);
+      setLoaderMessage("");
     }
   };
 
@@ -86,9 +89,13 @@ function ExploreContent() {
 
   return (
     <div className="search-page container">
-      {loading && (
-        <div className="loader-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.8)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-          <div style={{color: '#fbbf24', fontSize: '1.5em'}}>جاري التحميل...</div>
+      {(loading || isGoodreadsLoading) && (
+        <div className="loader-overlay" style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.8)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column'}}>
+          <div className="spinner" style={{width: '40px', height: '40px', border: '4px solid rgba(251,191,36,0.2)', borderTop: '4px solid #fbbf24', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '20px'}}></div>
+          <div style={{color: '#fbbf24', fontSize: '1.2em'}}>{loaderMessage || "جاري التحميل..."}</div>
+          <style>{`
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          `}</style>
         </div>
       )}
 
