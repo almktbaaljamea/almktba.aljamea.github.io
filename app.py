@@ -98,12 +98,23 @@ def get_goodreads_link():
         return jsonify({"error": "No query"}), 400
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
     }
     search_url = f"https://www.goodreads.com/search?q={requests.utils.quote(book_name)}"
 
     try:
-        resp = requests.get(search_url, headers=headers, timeout=10)
+        session = requests.Session()
+        resp = session.get(search_url, headers=headers, timeout=15, allow_redirects=True)
         if resp.status_code != 200:
             return jsonify({"url": None, "message": "فشل الاتصال بـ Goodreads"})
 
@@ -160,6 +171,7 @@ def get_goodreads_link():
     except Exception as e:
         print(f"Error fetching Goodreads link: {e}")
         return jsonify({"url": None, "message": "حدث خطأ"})
+
 
 
 # ========== النسخ الاحتياطي ==========

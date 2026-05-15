@@ -56,18 +56,19 @@ function ExploreContent() {
 
   const handleOpenGoodreads = async (bookName: string) => {
     setIsGoodreadsLoading(true);
+    const fallbackUrl = `https://duckduckgo.com/?q=!ducky+site:goodreads.com/book/show+${encodeURIComponent(bookName)}`;
     try {
       const res = await fetch(`/get_goodreads_link?q=${encodeURIComponent(bookName)}`);
       const data = await res.json();
       if (data.url) {
         window.open(data.url, '_blank');
       } else {
-        // fallback: open Goodreads search page
-        window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
+        // fallback: DuckDuckGo redirects directly to the best Goodreads book page
+        window.open(fallbackUrl, '_blank');
       }
     } catch (e) {
       console.error(e);
-      window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
+      window.open(fallbackUrl, '_blank');
     } finally {
       setIsGoodreadsLoading(false);
     }
