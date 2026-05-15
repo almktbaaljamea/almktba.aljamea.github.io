@@ -52,9 +52,25 @@ function ExploreContent() {
     return true;
   });
 
-  const handleOpenGoodreads = (bookName: string) => {
-    const searchUrl = `https://duckduckgo.com/?q=!ducky+site:goodreads.com/book/show+${encodeURIComponent(bookName)}`;
-    window.open(searchUrl, '_blank');
+  const [isGoodreadsLoading, setIsGoodreadsLoading] = useState(false);
+
+  const handleOpenGoodreads = async (bookName: string) => {
+    setIsGoodreadsLoading(true);
+    try {
+      const res = await fetch(`/get_goodreads_link?q=${encodeURIComponent(bookName)}`);
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, '_blank');
+      } else {
+        // fallback: open Goodreads search page
+        window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
+      }
+    } catch (e) {
+      console.error(e);
+      window.open(`https://www.goodreads.com/search?q=${encodeURIComponent(bookName)}`, '_blank');
+    } finally {
+      setIsGoodreadsLoading(false);
+    }
   };
 
   const handleWhatsApp = (book: any) => {
@@ -158,8 +174,8 @@ function ExploreContent() {
                 <button className="action-btn btn-whatsapp" onClick={() => handleWhatsApp(selectedBook)}>
                   💬 تواصل مع المكتبة
                 </button>
-                <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)}>
-                  📊 تقييمات Goodreads
+                <button className="action-btn btn-goodreads" onClick={() => handleOpenGoodreads(selectedBook.book_name)} disabled={isGoodreadsLoading}>
+                  {isGoodreadsLoading ? '⏳ جاري البحث...' : '📊 تقييمات Goodreads'}
                 </button>
               </div>
             </div>

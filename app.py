@@ -90,7 +90,77 @@ def search(query):
     conn.close()
     return [dict(row) for row in results]
 
-# ========== نقاط النهاية الجديدة ==========
+# ========== نقطة النهاية الذكية لـ Goodreads ==========
+@app.route("/get_goodreads_link")
+def get_goodreads_link():
+    book_name = request.args.get("q", "").strip()
+    if not book_name:
+        return jsonify({"error": "No query"}), 400
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+    search_url = f"https://www.goodreads.com/search?q={requests.utils.quote(book_name)}"
+
+    try:
+        resp = requests.get(search_url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return jsonify({"url": None, "message": "فشل الاتصال بـ Goodreads"})
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        table = soup.find("table", class_="tableList")
+        if not table:
+            return jsonify({"url": None, "message": "لم يتم العثور على نتائج"})
+
+        rows = table.find_all("tr")
+        best_match = None
+        best_score = -1
+
+        for row in rows:
+            link_tag = row.find("a", class_="bookTitle")
+            if not link_tag:
+                continue
+
+            title = link_tag.get_text(strip=True)
+            href = link_tag.get("href", "")
+            if not href.startswith("http"):
+                href = "https://www.goodreads.com" + href
+
+            # استخراج التقييم وعدد المقيمين
+            rating_span = None
+            for span in row.find_all("span"):
+                if "minirating" in span.get("class", []):
+                    rating_span = span
+                    break
+
+            rating = 0.0
+            ratings_count = 0
+            if rating_span:
+                text = rating_span.get_text()
+                rating_match = re.search(r'(\d+\.?\d*)\s*avg', text)
+                count_match = re.search(r'(\d[\d,]*)\s*ratings', text)
+                if rating_match:
+                    rating = float(rating_match.group(1))
+                if count_match:
+                    ratings_count = int(count_match.group(1).replace(',', ''))
+
+            # حساب درجة المطابقة: تشابه النص + التقييم + عدد المقيمين
+            similarity = SequenceMatcher(None, book_name.lower(), title.lower()).ratio()
+            score = similarity * 10 + (ratings_count / 1000) + (rating / 10)
+
+            if score > best_score:
+                best_score = score
+                best_match = href
+
+        if best_match:
+            return jsonify({"url": best_match})
+        else:
+            return jsonify({"url": None, "message": "لم يتم العثور على تطابق مناسب"})
+
+    except Exception as e:
+        print(f"Error fetching Goodreads link: {e}")
+        return jsonify({"url": None, "message": "حدث خطأ"})
+
 
 # ========== النسخ الاحتياطي ==========
 @app.route("/backup")
